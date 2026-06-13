@@ -684,7 +684,8 @@ document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>{
   document.querySelectorAll('nav button').forEach(x=>x.classList.remove('on')); b.classList.add('on');
   Object.values(views).forEach(id=>document.getElementById(id).classList.remove('active'));
   document.getElementById(views[b.dataset.view]).classList.add('active');
-  if(b.dataset.view==='history')renderHistory(); if(b.dataset.view==='stats')renderStats();
+  if(b.dataset.view==='history')renderHistory();
+  if(b.dataset.view==='stats')requestAnimationFrame(renderStats);
   window.scrollTo(0,0);
 });
 
@@ -1051,18 +1052,28 @@ function renderHistory(){
 let RW=8;
 document.querySelectorAll('#rangeSeg button').forEach(b=>b.onclick=()=>{ document.querySelectorAll('#rangeSeg button').forEach(x=>x.classList.remove('on')); b.classList.add('on'); RW=+b.dataset.w; renderStats(); });
 function weekList(n){ const out=[]; let d=new Date(thisWeek()+"T00:00:00"); for(let i=0;i<n;i++){ out.unshift(dateKey(d)); d.setDate(d.getDate()-7); } return out; }
+function addWeeks(mk,n){ const d=new Date(mk+"T00:00:00"); d.setDate(d.getDate()+n*7); return dateKey(d); }
+function statWeeks(){
+  if(RW<999) return weekList(Math.min(RW,52));
+  const current=thisWeek();
+  const logged=DB.sets.map(s=>mondayOf(s.date)).sort();
+  const start=logged[0]&&logged[0]<current ? logged[0] : current;
+  const out=[];
+  for(let mk=start; mk<=current; mk=addWeeks(mk,1)) out.push(mk);
+  return out.length?out:[current];
+}
 function renderStats(){
-  const weeks=weekList(Math.min(RW,52));
-  const inRange=s=>RW>=999||weeks.includes(mondayOf(s.date));
+  const weeks=statWeeks();
+  const inRange=s=>weeks.includes(mondayOf(s.date));
   const sets=DB.sets.filter(inRange);
   document.getElementById('aVol').textContent=sets.length;
   document.getElementById('aSets').textContent=new Set(sets.map(s=>s.exId)).size;
   // weekly target hit %
-  const wks=RW>=999?[...new Set(DB.sets.map(s=>mondayOf(s.date)))]:weeks;
+  const wks=weeks;
   const tgtTotal=DB.exercises.reduce((a,e)=>a+e.target,0);
   let hitSum=0,wkCount=0;
   wks.forEach(mk=>{ if(mk>thisWeek())return; let done=0; DB.exercises.forEach(e=>done+=Math.min(setsFor(e.id,mk).length,e.target));
-    if(setsForWeekAny(mk)){ hitSum+=tgtTotal?done/tgtTotal:0; wkCount++; } });
+    if(setsForWeekAny(mk)||mk===thisWeek()){ hitSum+=tgtTotal?done/tgtTotal:0; wkCount++; } });
   document.getElementById('aHit').textContent=(wkCount?Math.round(hitSum/wkCount*100):0)+"%";
 
   drawSets(weeks);
@@ -1096,7 +1107,18 @@ const setsForWeekAny=mk=>DB.sets.some(s=>mondayOf(s.date)===mk);
 function topSetPerWeek(exId,weeks){ return weeks.map(mk=>bestSet(DB.sets.filter(s=>s.exId===exId&&mondayOf(s.date)===mk))); }
 
 /* ===== charts ===== */
-function setupCanvas(cv){ const dpr=window.devicePixelRatio||1,w=cv.clientWidth||cv.width,h=cv.height; cv.width=w*dpr;cv.height=h*dpr; const ctx=cv.getContext('2d'); ctx.scale(dpr,dpr); return {ctx,w,h}; }
+function setupCanvas(cv){
+  const dpr=window.devicePixelRatio||1;
+  const w=cv.clientWidth||cv.parentElement?.clientWidth||cv.width||300;
+  const h=+(cv.dataset.baseHeight||cv.getAttribute('height'))||cv.clientHeight||cv.height||140;
+  cv.dataset.baseHeight=h;
+  cv.style.height=h+"px";
+  cv.width=Math.max(1,Math.round(w*dpr));
+  cv.height=Math.max(1,Math.round(h*dpr));
+  const ctx=cv.getContext('2d');
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  return {ctx,w,h};
+}
 function drawSets(weeks){
   const cv=document.getElementById('setsChart'); const {ctx,w,h}=setupCanvas(cv); ctx.clearRect(0,0,w,h);
   const data=weeks.map(mk=>DB.sets.filter(s=>mondayOf(s.date)===mk).length);
