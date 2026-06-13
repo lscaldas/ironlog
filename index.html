@@ -168,6 +168,16 @@
     color:var(--txt);padding:11px 18px;border-radius:12px;font-size:13.5px;font-weight:600;z-index:200;opacity:0;transition:.3s;box-shadow:var(--shadow);pointer-events:none;white-space:nowrap;}
   .toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
 
+  .gate{position:fixed;inset:0;z-index:300;background:linear-gradient(180deg,#0b0f17 0%,#101725 100%);
+    display:flex;align-items:center;justify-content:center;padding:18px;}
+  .gate.hide{display:none;}
+  .gate-card{width:100%;max-width:420px;background:var(--card);border:1px solid var(--line);border-radius:18px;
+    padding:20px;box-shadow:var(--shadow);}
+  .gate-logo{width:54px;height:54px;border-radius:15px;background:linear-gradient(135deg,var(--accent),var(--accent2));
+    display:grid;place-items:center;font-size:26px;margin-bottom:14px;box-shadow:0 6px 16px rgba(255,90,60,.35);}
+  .gate-card h2{margin:0 0 6px;font-size:22px;}
+  .gate-card p{margin:0 0 16px;color:var(--muted);font-size:13px;line-height:1.4;}
+
   /* Finish workout */
   .finbtn{width:100%;background:linear-gradient(135deg,var(--good),#10b981);border:none;color:#06281d;
     font-weight:800;font-size:15px;padding:13px;border-radius:13px;cursor:pointer;box-shadow:0 6px 16px rgba(52,211,153,.3);
@@ -237,6 +247,18 @@
 </style>
 </head>
 <body>
+<div class="gate" id="profileGate">
+  <div class="gate-card">
+    <div class="gate-logo">🏋️</div>
+    <h2>Open IronLog</h2>
+    <p>Use a profile name and PIN. New profile names are created on first save.</p>
+    <div class="field"><label>Profile name</label><input id="gateProfile" autocomplete="username" placeholder="e.g. lucas"></div>
+    <div class="field"><label>PIN</label><input id="gatePin" type="password" inputmode="numeric" autocomplete="current-password" placeholder="Your profile PIN"></div>
+    <button class="btn" id="gateOpenBtn" type="button">Open profile</button>
+    <button class="ghost" id="gateLocalBtn" type="button" style="width:100%;margin-top:9px;">Use local only</button>
+    <p class="h3sub" id="gateMsg" style="margin:12px 0 0;"></p>
+  </div>
+</div>
 <div class="wrap">
   <header>
     <div class="brand"><div class="logo">🏋️</div><div><h1>IronLog</h1><p id="greeting">Weekly sets</p></div></div>
@@ -378,11 +400,8 @@
   <div class="card" style="box-shadow:none;margin-bottom:10px;">
     <div class="card-h"><h2>Profile</h2><div class="sub" id="cloudState">Local only</div></div>
     <div class="field">
-      <label>Who is training?</label>
-      <select id="profileSelect">
-        <option value="lucas">Lucas</option>
-        <option value="gf">GF</option>
-      </select>
+      <label>Profile name</label>
+      <input id="profileInput" autocomplete="username" placeholder="e.g. lucas">
     </div>
     <div class="field">
       <label>Cloud PIN</label>
@@ -411,7 +430,13 @@
 const LEGACY_KEY="ironlog.v2";
 const KEY_PREFIX="ironlog.v2.";
 const PROFILE_KEY="ironlog.profile";
-let ACTIVE_PROFILE=localStorage.getItem(PROFILE_KEY)||'lucas';
+function sanitizeProfileId(s){
+  return (s||'').toLowerCase().trim()
+    .replace(/[^a-z0-9_-]+/g,'-')
+    .replace(/^-+|-+$/g,'')
+    .slice(0,32);
+}
+let ACTIVE_PROFILE=sanitizeProfileId(localStorage.getItem(PROFILE_KEY)||'lucas')||'lucas';
 let DB=load();
 function profileKey(){ return KEY_PREFIX+ACTIVE_PROFILE; }
 function load(){
@@ -1071,8 +1096,8 @@ async function supabaseRequest(path,opts={}){
   const text=await res.text();
   return text ? JSON.parse(text) : null;
 }
-async function loadCloudProfile(){
-  const pin=document.getElementById('cloudPin').value.trim();
+async function loadCloudProfile(opts={}){
+  const pin=(opts.pin||document.getElementById('cloudPin').value).trim();
   if(!cloudReady()){ toast("Cloud not configured"); updateCloudUI(); return; }
   if(!pin){ toast("Enter profile PIN"); return; }
   setCloudState("Loading...");
@@ -1082,7 +1107,8 @@ async function loadCloudProfile(){
       CLOUD.pin=pin; CLOUD.unlocked=true;
       await saveCloudProfile(true);
       toast("Cloud profile created");
-      return;
+      if(opts.fromGate) hideProfileGate();
+      return true;
     }
     DB=await decryptProfile(rows[0].data,pin);
     CLOUD.pin=pin; CLOUD.unlocked=true;
@@ -1090,11 +1116,15 @@ async function loadCloudProfile(){
     save();
     refreshAll();
     toast("Cloud loaded");
+    if(opts.fromGate) hideProfileGate();
+    updateCloudUI();
+    return true;
   }catch(err){
     CLOUD.unlocked=false;
     toast(err.name==='OperationError'?"Wrong PIN":"Cloud load failed");
   }
   updateCloudUI();
+  return false;
 }
 async function saveCloudProfile(manual=false){
   const pin=(CLOUD.pin||document.getElementById('cloudPin').value||'').trim();
@@ -1127,7 +1157,8 @@ function queueCloudSave(delay=900){
 }
 function setCloudState(text){ document.getElementById('cloudState').textContent=text; }
 function updateCloudUI(){
-  document.getElementById('profileSelect').value=ACTIVE_PROFILE;
+  document.getElementById('profileInput').value=ACTIVE_PROFILE;
+  document.getElementById('gateProfile').value=ACTIVE_PROFILE;
   if(!cloudConfig().enabled){
     setCloudState("Local only");
     document.getElementById('cloudHelp').textContent="Cloud sync needs Supabase URL/key in cloud-config.js.";
@@ -1139,8 +1170,10 @@ function updateCloudUI(){
   setCloudState(CLOUD.unlocked ? `Cloud on${CLOUD.lastSaved?' · '+CLOUD.lastSaved:''}` : "Locked");
 }
 function switchProfile(profile){
-  if(profile===ACTIVE_PROFILE) return;
-  ACTIVE_PROFILE=profile;
+  const next=sanitizeProfileId(profile);
+  if(!next){ toast("Enter profile name"); return false; }
+  if(next===ACTIVE_PROFILE) return true;
+  ACTIVE_PROFILE=next;
   localStorage.setItem(PROFILE_KEY,ACTIVE_PROFILE);
   CLOUD.pin=''; CLOUD.unlocked=false; CLOUD.lastSaved='';
   document.getElementById('cloudPin').value='';
@@ -1149,10 +1182,29 @@ function switchProfile(profile){
   if(!DB.exercises.length) seed(false); else refreshAll();
   updateCloudUI();
   toast("Profile switched");
+  return true;
 }
-document.getElementById('profileSelect').onchange=e=>switchProfile(e.target.value);
-document.getElementById('cloudLoadBtn').onclick=loadCloudProfile;
-document.getElementById('cloudSaveBtn').onclick=()=>saveCloudProfile(true);
+function hideProfileGate(){ document.getElementById('profileGate').classList.add('hide'); }
+async function openProfileFromGate(useCloud=true){
+  const profile=document.getElementById('gateProfile').value;
+  const pin=document.getElementById('gatePin').value;
+  if(!switchProfile(profile)) return;
+  document.getElementById('cloudPin').value=pin;
+  if(!useCloud){
+    hideProfileGate();
+    toast("Local profile opened");
+    return;
+  }
+  if(!pin.trim()){ toast("Enter profile PIN"); return; }
+  document.getElementById('gateMsg').textContent="Opening profile...";
+  const ok=await loadCloudProfile({pin,fromGate:true});
+  document.getElementById('gateMsg').textContent=ok?"":"Could not open cloud profile. Check the PIN or cloud setup.";
+}
+document.getElementById('cloudLoadBtn').onclick=()=>{ if(switchProfile(document.getElementById('profileInput').value)) loadCloudProfile(); };
+document.getElementById('cloudSaveBtn').onclick=()=>{ if(switchProfile(document.getElementById('profileInput').value)) saveCloudProfile(true); };
+document.getElementById('gateOpenBtn').onclick=()=>openProfileFromGate(true);
+document.getElementById('gateLocalBtn').onclick=()=>openProfileFromGate(false);
+['gateProfile','gatePin'].forEach(id=>document.getElementById(id).addEventListener('keydown',e=>{ if(e.key==='Enter') openProfileFromGate(true); }));
 
 function seed(withHistory){
   DB={exercises:SEED.map(s=>({id:uid('e'),...s})), sets:[]};

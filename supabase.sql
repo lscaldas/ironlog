@@ -31,17 +31,17 @@ create policy "ironlog public read encrypted profiles"
 on public.ironlog_profiles
 for select
 to anon
-using (profile_id in ('lucas', 'gf'));
+using (profile_id ~ '^[a-z0-9][a-z0-9_-]{1,31}$');
 
 create policy "ironlog public insert encrypted profiles"
 on public.ironlog_profiles
 for insert
 to anon
-with check (profile_id in ('lucas', 'gf'));
+with check (profile_id ~ '^[a-z0-9][a-z0-9_-]{1,31}$');
 
 create policy "ironlog public update encrypted profiles"
 on public.ironlog_profiles
 for update
 to anon
-using (profile_id in ('lucas', 'gf'))
-with check (profile_id in ('lucas', 'gf'));
+using (profile_id ~ '^[a-z0-9][a-z0-9_-]{1,31}$')
+with check (profile_id ~ '^[a-z0-9][a-z0-9_-]{1,31}$');

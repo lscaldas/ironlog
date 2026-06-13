@@ -29,12 +29,7 @@ Do not publish the spreadsheet or `.transcription_crops/`; they are source artif
 
 Cloud sync uses Supabase as a tiny encrypted backup store. The app still works offline and saves locally first.
 
-Profiles:
-
-- `lucas`
-- `gf`
-
-Each profile uses its own PIN. The PIN is not sent to Supabase; it derives an AES-GCM encryption key in the browser. Supabase stores only encrypted JSON blobs.
+Each profile uses a profile name and PIN. New profile names are created on first cloud save. The PIN is not sent to Supabase; it derives an AES-GCM encryption key in the browser. Supabase stores only encrypted JSON blobs.
 
 This is casual privacy, not full account security. Anyone with the public app configuration could overwrite encrypted blobs if they know the profile IDs. They still cannot read the workout data without the PIN.
 
@@ -56,7 +51,7 @@ window.IRONLOG_CLOUD = {
 
 7. Commit and push the update.
 
-In the app, open **Data & backup**, choose `Lucas` or `GF`, enter that profile's PIN, then use **Load cloud** or **Save cloud**. After a profile is unlocked, normal changes auto-save encrypted to cloud.
+In the app, enter a profile name and PIN on the first screen. If the encrypted cloud profile already exists, it loads. If it does not exist, the app creates it from the current local program. After a profile is unlocked, normal changes auto-save encrypted to cloud.
 
 ### GitHub Pages
 
