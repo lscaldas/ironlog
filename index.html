@@ -229,6 +229,21 @@
   .mct{width:46px;text-align:right;font-weight:700;font-variant-numeric:tabular-nums;color:var(--txt);}
   .mrow.ignored .mname,.mrow.ignored .mct{color:var(--accent);}
 
+  /* Exercise catalog */
+  .cat-grid{display:grid;gap:10px;}
+  .cat-card{background:linear-gradient(180deg,rgba(21,30,43,.98),rgba(18,26,38,.98));border:1px solid rgba(255,255,255,.06);
+    border-radius:10px;padding:12px;}
+  .cat-top{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:8px;}
+  .cat-name{font-size:14.5px;font-weight:780;line-height:1.25;}
+  .cat-tag{flex-shrink:0;background:var(--bg2);border:1px solid var(--line);color:var(--muted);border-radius:999px;padding:4px 7px;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.35px;}
+  .cat-meta{font-size:11.5px;color:var(--dim);line-height:1.35;margin-top:3px;}
+  .cat-match{color:var(--muted);}
+  .cat-contribs{display:flex;flex-wrap:wrap;gap:6px;margin-top:9px;}
+  .cat-contrib{display:flex;align-items:center;gap:6px;background:var(--bg2);border:1px solid var(--line);border-radius:8px;padding:6px 8px;font-size:12px;color:var(--muted);}
+  .cat-contrib.primary{border-color:rgba(105,167,255,.45);color:var(--txt);}
+  .cat-contrib b{color:var(--txt);font-variant-numeric:tabular-nums;}
+  .cat-keys{font-size:11px;color:var(--dim);margin-top:8px;line-height:1.35;}
+
   @media (min-width:900px){
     body{padding:0 0 0 92px;background:linear-gradient(135deg,#090d14 0%,#101725 48%,#0d1420 100%);}
     .wrap{max-width:1280px;padding:24px 28px 40px;}
@@ -256,6 +271,8 @@
     #v-stats .strip{grid-template-columns:repeat(3,minmax(0,1fr));}
     #v-stats .card{margin-bottom:0;}
     #v-stats .card:last-child{grid-column:1 / -1;}
+    #v-catalog.active{max-width:980px;margin:0 auto;display:block;}
+    #v-catalog .cat-grid{grid-template-columns:repeat(auto-fit,minmax(280px,1fr));}
 
     .sheet{left:50%;right:auto;bottom:auto;top:50%;width:min(540px,calc(100vw - 140px));max-width:none;
       border:1px solid var(--line);border-radius:22px;transform:translate(-50%,120vh);padding:20px;}
@@ -364,12 +381,26 @@
       <div id="volBars"></div>
     </div>
   </section>
+
+  <!-- ===== CATALOG ===== -->
+  <section class="view" id="v-catalog">
+    <div class="card-h" style="padding:0 4px;margin-bottom:10px;">
+      <h2 style="font-size:17px;">Exercise catalog</h2>
+      <div class="sub" id="catalogCount"></div>
+    </div>
+    <div class="field"><input id="catalogSearch" placeholder="Search exercise or muscle" autocomplete="off"></div>
+    <div class="bucket-h"><h2>Your program mapping</h2><div class="ln"></div><span class="bcount" id="programMapCount"></span></div>
+    <div class="cat-grid" id="programMapList"></div>
+    <div class="bucket-h"><h2>Catalog</h2><div class="ln"></div><span class="bcount" id="catalogMapCount"></span></div>
+    <div class="cat-grid" id="catalogList"></div>
+  </section>
 </div>
 
 <nav>
   <button class="on" data-view="week"><span class="ic">📋</span>Week</button>
   <button data-view="history"><span class="ic">📅</span>History</button>
   <button data-view="stats"><span class="ic">📈</span>Progress</button>
+  <button data-view="catalog"><span class="ic">&#9638;</span>Catalog</button>
 </nav>
 
 <!-- Log set sheet -->
@@ -570,10 +601,8 @@ const EXERCISE_TAXONOMY=[
   {base:"Core", muscle:"Core", area:"Core", keys:["plank","crunch","situp","sit-up","ab ","abs","core","leg raise"], secondary:{}},
 ];
 function normName(s){ return (s||'').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim(); }
-function exerciseMatch(name){
+function taxonomyMatch(name){
   const raw=(name||'').trim();
-  const exact=NAME_MUSCLE[raw]&&{base:raw,muscle:NAME_MUSCLE[raw],area:NAME_AREA[raw]||NAME_MUSCLE[raw],secondary:{},confidence:'exact'};
-  if(exact) return exact;
   const n=' '+normName(raw)+' ';
   let best=null;
   EXERCISE_TAXONOMY.forEach(x=>{
@@ -587,6 +616,13 @@ function exerciseMatch(name){
     });
   });
   return best;
+}
+function exerciseMatch(name){
+  const raw=(name||'').trim();
+  const tax=taxonomyMatch(raw);
+  const exact=NAME_MUSCLE[raw]&&{base:raw,muscle:NAME_MUSCLE[raw],area:NAME_AREA[raw]||NAME_MUSCLE[raw],secondary:{...(tax?.secondary||{})},confidence:'exact',matchedBase:tax?.base||raw,keys:tax?.keys||[]};
+  if(exact) return exact;
+  return tax;
 }
 function guessMuscle(name){ return exerciseMatch(name)?.muscle||''; }
 const muscleOf=ex=>ex.muscle||guessMuscle(ex.name)||'';
@@ -603,7 +639,7 @@ function secondaryMuscles(ex){
   const m=muscleOf(ex)||'Other';
   const area=areaOf(ex)||'';
   const matched=exerciseMatch(ex.name);
-  if(matched?.secondary) return {...matched.secondary};
+  if(matched?.secondary&&Object.keys(matched.secondary).length) return {...matched.secondary};
   const out={};
   const add=(muscle,weight)=>{ if(muscle&&muscle!==m) out[muscle]=(out[muscle]||0)+weight; };
   if(m==='Back'){
@@ -679,13 +715,14 @@ function suggest(ex){
 }
 
 /* ================= View switching ================= */
-const views={week:"v-week",history:"v-history",stats:"v-stats"};
+const views={week:"v-week",history:"v-history",stats:"v-stats",catalog:"v-catalog"};
 document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>{
   document.querySelectorAll('nav button').forEach(x=>x.classList.remove('on')); b.classList.add('on');
   Object.values(views).forEach(id=>document.getElementById(id).classList.remove('active'));
   document.getElementById(views[b.dataset.view]).classList.add('active');
   if(b.dataset.view==='history')renderHistory();
   if(b.dataset.view==='stats')requestAnimationFrame(renderStats);
+  if(b.dataset.view==='catalog')renderCatalog();
   window.scrollTo(0,0);
 });
 
@@ -1024,6 +1061,67 @@ document.getElementById('delExBtn').onclick=()=>{
     DB.exercises=DB.exercises.filter(x=>x.id!==editEx.id); save(); closeSheets(); renderWeek(); toast("Removed");
   }
 };
+
+/* ================= CATALOG ================= */
+function contribListFor(ex){
+  const primary=muscleOf(ex)||'Other';
+  const parts=[{muscle:primary,weight:1,primary:true}];
+  Object.entries(secondaryMuscles(ex)).sort((a,b)=>b[1]-a[1]).forEach(([muscle,weight])=>{
+    if(muscle&&muscle!==primary&&weight>0) parts.push({muscle,weight,primary:false});
+  });
+  return parts;
+}
+function contribHtml(ex){
+  return contribListFor(ex).map(p=>`<span class="cat-contrib ${p.primary?'primary':''}">${esc(p.muscle)} <b>${fmtEff(p.weight)}</b></span>`).join('');
+}
+function catalogSearchText(entry){
+  return [entry.name,entry.source,entry.match?.base,entry.match?.matchedBase,entry.muscle,entry.area,(entry.keys||[]).join(' '),...contribListFor(entry).map(p=>p.muscle)].join(' ').toLowerCase();
+}
+function catalogCard(entry){
+  const match=entry.match;
+  const matchedBase=match?.matchedBase||match?.base||entry.name;
+  const showMatch=match&&normName(matchedBase)!==normName(entry.name);
+  const keys=entry.keys?.length?`<div class="cat-keys">Matches: ${entry.keys.slice(0,8).map(esc).join(', ')}</div>`:'';
+  return `<div class="cat-card">
+    <div class="cat-top">
+      <div>
+        <div class="cat-name">${esc(entry.name)}</div>
+        <div class="cat-meta">${esc(entry.muscle)} · ${esc(entry.area)}${showMatch?` · <span class="cat-match">counting as ${esc(matchedBase)}</span>`:''}</div>
+      </div>
+      <span class="cat-tag">${esc(entry.source)}</span>
+    </div>
+    <div class="cat-contribs">${contribHtml(entry)}</div>
+    ${keys}
+  </div>`;
+}
+function catalogEntryFromName(name,source){
+  const match=exerciseMatch(name);
+  const muscle=match?.muscle||NAME_MUSCLE[name]||guessMuscle(name)||'Other';
+  const area=match?.area||NAME_AREA[name]||guessArea(name)||muscle;
+  return {name,source,muscle,area,match,keys:match?.keys||[]};
+}
+function catalogEntries(){
+  const out=LIB.map(name=>catalogEntryFromName(name,'Suggested'));
+  const seen=new Set(out.map(e=>normName(e.match?.base||e.name)));
+  EXERCISE_TAXONOMY.forEach(x=>{
+    if(seen.has(normName(x.base))) return;
+    out.push({name:x.base,source:'Matcher',muscle:x.muscle,area:x.area,match:{...x,confidence:'exact'},keys:x.keys||[]});
+    seen.add(normName(x.base));
+  });
+  return out.sort((a,b)=>a.muscle.localeCompare(b.muscle)||a.name.localeCompare(b.name));
+}
+function renderCatalog(){
+  const q=(document.getElementById('catalogSearch')?.value||'').trim().toLowerCase();
+  const matchQ=entry=>!q||catalogSearchText(entry).includes(q);
+  const program=DB.exercises.map(e=>({name:e.name,source:e.bucket||'Program',muscle:muscleOf(e)||'Other',area:areaOf(e)||'Other',match:exerciseMatch(e.name),keys:exerciseMatch(e.name)?.keys||[]})).filter(matchQ);
+  const catalog=catalogEntries().filter(matchQ);
+  document.getElementById('catalogCount').textContent=`${catalog.length} catalogued`;
+  document.getElementById('programMapCount').textContent=`${program.length}`;
+  document.getElementById('catalogMapCount').textContent=`${catalog.length}`;
+  document.getElementById('programMapList').innerHTML=program.length?program.map(catalogCard).join(''):`<div class="sub">No program exercises match this search.</div>`;
+  document.getElementById('catalogList').innerHTML=catalog.length?catalog.map(catalogCard).join(''):`<div class="sub">No catalog exercises match this search.</div>`;
+}
+document.getElementById('catalogSearch').oninput=renderCatalog;
 
 /* ================= HISTORY ================= */
 function renderHistory(){
@@ -1440,6 +1538,7 @@ window.addEventListener('resize',()=>{ if(document.getElementById('v-stats').cla
 normalizeDB();
 if(!DB.exercises.length){ seed(false); }
 refreshAll();
+renderCatalog();
 updateCloudUI();
 
 if('serviceWorker' in navigator){
