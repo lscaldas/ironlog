@@ -81,6 +81,11 @@
   .ex-meta{display:flex;align-items:center;gap:8px;margin-top:7px;}
   .exsub{font-size:11.5px;color:var(--dim);margin-top:5px;line-height:1.3;}
   .exsub .up{color:var(--good);font-weight:600;}
+  .match-note{margin-top:7px;color:var(--muted);font-size:11px;line-height:1.25;}
+  .match-note b{color:var(--txt);font-weight:750;}
+  .form-hint{font-size:11.5px;color:var(--muted);margin:-4px 0 10px 2px;line-height:1.3;display:none;}
+  .form-hint.show{display:block;}
+  .form-hint b{color:var(--txt);font-weight:750;}
   .dots{display:flex;gap:4px;flex-wrap:wrap;align-items:center;}
   .dot{width:18px;height:18px;border-radius:5px;border:1.5px solid var(--line);background:var(--bg2);
     display:grid;place-items:center;font-size:9px;color:var(--dim);transition:.15s;}
@@ -394,6 +399,7 @@
   <h3 id="exTitle">Add exercise</h3>
   <p class="h3sub">Set a weekly set target. Double progression: hit the top of your rep range, then add weight.</p>
   <div class="field"><label>Exercise name</label><input id="fName" list="exDL" placeholder="e.g. Pullups" autocomplete="off"><datalist id="exDL"></datalist></div>
+  <div class="form-hint" id="matchHint"></div>
   <div class="row">
     <div class="field"><label>Muscle group</label><input id="fMuscle" list="muDL" placeholder="e.g. Back" autocomplete="off"><datalist id="muDL"></datalist></div>
     <div class="field"><label>Area / head</label><input id="fArea" list="arDL" placeholder="e.g. Rear delts" autocomplete="off"><datalist id="arDL"></datalist></div>
@@ -535,52 +541,51 @@ const NAME_AREA={"Rows":"Mid back / lats","Cable Rows":"Mid back / lats","Pullup
   "Cable Lateral Raise - Upper Path":"Side delts - upper path","Triceps Pulldown":"Lateral / medial head",
   "Triceps Overhead Ext.":"Triceps long head","Biceps Curls":"Biceps","Bayesian Single-arm Curl":"Biceps","Shrugs":"Upper traps","Single-arm Cable Shrugs":"Upper traps",
   "Squats":"Quads / glutes","Cable Squats":"Quads / glutes","Leg Curls":"Hamstrings","Single Cable Leg Curl":"Hamstrings","Calf Raises":"Calves","Cable Single-leg Calf Raise":"Calves"};
-function guessMuscle(name){
-  if(NAME_MUSCLE[name]) return NAME_MUSCLE[name];
-  const n=(name||'').toLowerCase();
-  const tbl=[
-    ['Back',['row','pulldown','pull-up','pullup','pull up','chin','lat']],
-    ['Chest',['bench','chest','fly','flye','push-up','pushup','push up','pec']],
-    ['Shoulders',['shoulder','lateral','delt','face pull','ohp','military','overhead press']],
-    ['Triceps',['tricep','pushdown','skull']],
-    ['Hamstrings',['deadlift','leg curl','rdl','ham']],
-    ['Biceps',['bicep','curl','bayesian']],
-    ['Traps',['shrug','trap']],
-    ['Glutes',['glute','hip thrust']],
-    ['Quads',['squat','leg press','lunge','extension','quad']],
-    ['Calves',['calf','calve']],
-    ['Core',['plank','crunch','oblique','core',' ab']],
-  ];
-  for(const [m,keys] of tbl){ if(keys.some(k=>n.includes(k))) return m; }
-  return '';
+const EXERCISE_TAXONOMY=[
+  {base:"Pullups", muscle:"Back", area:"Lats", keys:["pullup","pull-up","pull up","chinup","chin-up","chin up"], secondary:{Biceps:.5,Traps:.2}},
+  {base:"Lat Pulldown", muscle:"Back", area:"Lats", keys:["lat pulldown","pulldown","pull down"], secondary:{Biceps:.5,Traps:.2}},
+  {base:"Cable Rows", muscle:"Back", area:"Mid back / lats", keys:["row","rows","cable row","seated row"], secondary:{Biceps:.5,Traps:.35}},
+  {base:"Pushups", muscle:"Chest", area:"Mid chest", keys:["pushup","push-up","push up"], secondary:{Triceps:.45,Shoulders:.35}},
+  {base:"Bench Press", muscle:"Chest", area:"Mid chest", keys:["bench","bench press","press bench"], secondary:{Triceps:.45,Shoulders:.35}},
+  {base:"Chest Fly", muscle:"Chest", area:"Chest isolation", keys:["fly","flye","pec deck","cable fly"], secondary:{Shoulders:.15}},
+  {base:"Ring Dips", muscle:"Chest", area:"Lower chest / triceps", keys:["ring dip","rings dip","dip","dips"], secondary:{Triceps:.65,Shoulders:.25}},
+  {base:"Overhead Press", muscle:"Shoulders", area:"Front delts", keys:["overhead press","ohp","shoulder press","military press"], secondary:{Triceps:.4}},
+  {base:"Lateral Raises", muscle:"Shoulders", area:"Side delts - lower path", keys:["lateral raise","lateral raises","side raise","side delt"], secondary:{}},
+  {base:"Face Pulls", muscle:"Shoulders", area:"Rear delts / upper back", keys:["face pull","rear delt","rear delts"], secondary:{Back:.3,Traps:.25}},
+  {base:"Triceps Pulldown", muscle:"Triceps", area:"Lateral / medial head", keys:["tricep pulldown","triceps pulldown","tricep pushdown","triceps pushdown","pushdown"], secondary:{}},
+  {base:"Triceps Overhead Extension", muscle:"Triceps", area:"Triceps long head", keys:["overhead tricep","overhead triceps","overhead extension","skull crusher","skullcrusher"], secondary:{}},
+  {base:"Biceps Curls", muscle:"Biceps", area:"Biceps", keys:["bicep curl","biceps curl","curl","curls","hammer curl","bayesian curl"], secondary:{Forearms:.2}},
+  {base:"Shrugs", muscle:"Traps", area:"Upper traps", keys:["shrug","shrugs","trap raise"], secondary:{}},
+  {base:"Squats", muscle:"Quads", area:"Quads / glutes", keys:["squat","squats","leg press","lunge","lunges"], secondary:{Glutes:.5,Hamstrings:.2}},
+  {base:"Leg Extension", muscle:"Quads", area:"Quads / glutes", keys:["leg extension","quad extension"], secondary:{}},
+  {base:"Leg Curls", muscle:"Hamstrings", area:"Hamstrings", keys:["leg curl","leg curls","hamstring curl","ham curls"], secondary:{Glutes:.1}},
+  {base:"Romanian Deadlift", muscle:"Hamstrings", area:"Hamstrings", keys:["romanian deadlift","rdl","deadlift"], secondary:{Glutes:.45,Back:.2}},
+  {base:"Hip Thrust", muscle:"Glutes", area:"Quads / glutes", keys:["hip thrust","glute bridge","glute"], secondary:{Hamstrings:.25}},
+  {base:"Calf Raises", muscle:"Calves", area:"Calves", keys:["calf raise","calf raises","calves"], secondary:{}},
+  {base:"Core", muscle:"Core", area:"Core", keys:["plank","crunch","situp","sit-up","ab ","abs","core","leg raise"], secondary:{}},
+];
+function normName(s){ return (s||'').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim(); }
+function exerciseMatch(name){
+  const raw=(name||'').trim();
+  const exact=NAME_MUSCLE[raw]&&{base:raw,muscle:NAME_MUSCLE[raw],area:NAME_AREA[raw]||NAME_MUSCLE[raw],secondary:{},confidence:'exact'};
+  if(exact) return exact;
+  const n=' '+normName(raw)+' ';
+  let best=null;
+  EXERCISE_TAXONOMY.forEach(x=>{
+    x.keys.forEach(k=>{
+      const nk=normName(k);
+      if(!nk) return;
+      const hit=n.includes(' '+nk+' ') || n.includes(nk);
+      if(!hit) return;
+      const score=nk.length+(n.trim()===nk?50:0);
+      if(!best||score>best.score) best={...x,score,confidence:n.trim()===nk?'exact':'partial'};
+    });
+  });
+  return best;
 }
+function guessMuscle(name){ return exerciseMatch(name)?.muscle||''; }
 const muscleOf=ex=>ex.muscle||guessMuscle(ex.name)||'';
-function guessArea(name){
-  if(NAME_AREA[name]) return NAME_AREA[name];
-  const n=(name||'').toLowerCase();
-  const tbl=[
-    ['Rear delts / upper back',['face pull','rear delt']],
-    ['Side delts - upper path',['liu','upper path','overhead lateral']],
-    ['Side delts - lower path',['lateral','side delt']],
-    ['Lats',['pullup','pull-up','pull up','lat','pulldown']],
-    ['Mid back / lats',['row']],
-    ['Upper chest',['incline']],
-    ['Lower chest / triceps',['ring dip','rings dip']],
-    ['Chest isolation',['fly','flye']],
-    ['Mid chest',['pushup','push-up','push up','bench','chest']],
-    ['Triceps long head',['overhead ext','overhead tricep','long head']],
-    ['Lateral / medial head',['triceps pull','pushdown','pulldown']],
-    ['Front delts',['shoulder press','overhead press','ohp','military']],
-    ['Upper traps',['shrug','trap']],
-    ['Quads / glutes',['squat','leg press','lunge']],
-    ['Hamstrings',['leg curl','hamstring','rdl']],
-    ['Calves',['calf','calve']],
-    ['Biceps',['bicep','curl','bayesian']],
-    ['Core',['plank','crunch','core',' ab']],
-  ];
-  for(const [a,keys] of tbl){ if(keys.some(k=>n.includes(k))) return a; }
-  return '';
-}
+function guessArea(name){ return exerciseMatch(name)?.area||''; }
 const areaOf=ex=>ex.area||guessArea(ex.name)||muscleOf(ex)||'Other';
 const pplOf=ex=>AREA_PPL[areaOf(ex)]||MUSCLE_PPL[muscleOf(ex)]||'Other';
 const REC_SETS={
@@ -592,6 +597,8 @@ function secondaryMuscles(ex){
   const name=(ex.name||'').toLowerCase();
   const m=muscleOf(ex)||'Other';
   const area=areaOf(ex)||'';
+  const matched=exerciseMatch(ex.name);
+  if(matched?.secondary) return {...matched.secondary};
   const out={};
   const add=(muscle,weight)=>{ if(muscle&&muscle!==m) out[muscle]=(out[muscle]||0)+weight; };
   if(m==='Back'){
@@ -613,6 +620,11 @@ function secondaryMuscles(ex){
   return out;
 }
 function fmtEff(n){ return Number.isInteger(n)?String(n):n.toFixed(1); }
+function inferredExerciseNote(ex){
+  const match=exerciseMatch(ex.name);
+  if(!match||match.confidence==='exact') return '';
+  return `Counting as <b>${esc(match.base)}</b> for muscle tracking.`;
+}
 
 /* ================= Helpers ================= */
 const setsFor=(exId,mk)=>DB.sets.filter(s=>s.exId===exId && mondayOf(s.date)===mk);
@@ -817,12 +829,14 @@ function exCard(e,mk){
   const best=bestSet(sets);
   const chips=sets.map(s=>`<span class="wkchip ${best&&s.id===best.id&&done>1?'best':''}"><b>${s.reps}</b>×${fmtW(s.kg)}<span class="x" data-sid="${s.id}">✕</span></span>`).join('');
   const tip=sg.tip+(e.notes?` · ${esc(e.notes)}`:'');
+  const matchNote=inferredExerciseNote(e);
   node.innerHTML=`
     <div class="ex-top">
       <div class="ex-main">
         <div class="exname">${esc(e.name)}</div>
         <div class="ex-meta"><span class="dots">${dots}</span><span class="remain">${isDone?'done ✓':'<b>'+done+'</b>/'+e.target}</span></div>
         <div class="exsub">${tip}</div>
+        ${matchNote?`<div class="match-note">${matchNote}</div>`:''}
       </div>
       <button class="editEx" title="Edit">⚙︎</button>
       <button class="log-plus" title="Log set">＋</button>
@@ -949,15 +963,39 @@ function openEx(e){
   document.getElementById('muDL').innerHTML=MUSCLES.concat(['Other']).map(m=>`<option value="${m}">`).join('');
   document.getElementById('arDL').innerHTML=AREAS.concat(['Other']).map(a=>`<option value="${a}">`).join('');
   document.getElementById('bkDL').innerHTML=[...new Set(DB.exercises.map(x=>x.bucket).concat(['Upper','Arms','Legs','Core']))].map(b=>`<option value="${b}">`).join('');
+  updateMatchHint();
   openSheet('exSheet');
 }
 document.getElementById('addExBtn').onclick=()=>openEx(null);
-document.getElementById('fName').onchange=()=>{
+function updateMatchHint(){
   const name=document.getElementById('fName').value.trim();
+  const hint=document.getElementById('matchHint');
+  const match=exerciseMatch(name);
+  if(match&&match.confidence!=='exact'){
+    hint.innerHTML=`Counting as <b>${esc(match.base)}</b>: ${esc(match.muscle)} · ${esc(match.area)}`;
+    hint.classList.add('show');
+  }else{
+    hint.textContent='';
+    hint.classList.remove('show');
+  }
+}
+function inferNameFields(){
+  const name=document.getElementById('fName').value.trim();
+  const match=exerciseMatch(name);
   const m=document.getElementById('fMuscle');
   const a=document.getElementById('fArea');
-  if(!m.value.trim()) m.value=guessMuscle(name);
-  if(!a.value.trim()) a.value=guessArea(name);
+  if(match){
+    if(!m.value.trim()) m.value=match.muscle;
+    if(!a.value.trim()) a.value=match.area;
+  }else{
+    if(!m.value.trim()) m.value=guessMuscle(name);
+    if(!a.value.trim()) a.value=guessArea(name);
+  }
+  updateMatchHint();
+}
+document.getElementById('fName').oninput=inferNameFields;
+document.getElementById('fName').onchange=()=>{
+  inferNameFields();
 };
 document.getElementById('saveExBtn').onclick=()=>{
   const name=document.getElementById('fName').value.trim(); if(!name){ toast("Name it"); return; }
