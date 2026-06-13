@@ -44,13 +44,13 @@ This is casual privacy, not full account security. Anyone with the public app co
 2. Open **SQL Editor**.
 3. Run the SQL in `supabase.sql`.
 4. Open **Project Settings -> API**.
-5. Copy the project URL and anon public key.
+5. Copy the project URL and anon public/publishable key.
 6. Put them into `cloud-config.js`:
 
 ```js
 window.IRONLOG_CLOUD = {
   supabaseUrl: "https://YOUR_PROJECT.supabase.co",
-  supabaseAnonKey: "YOUR_ANON_PUBLIC_KEY"
+  supabaseAnonKey: "YOUR_ANON_OR_PUBLISHABLE_PUBLIC_KEY"
 };
 ```
 
