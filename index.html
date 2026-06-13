@@ -1068,7 +1068,8 @@ async function supabaseRequest(path,opts={}){
     throw new Error(text||('Cloud request failed: '+res.status));
   }
   if(res.status===204) return null;
-  return res.json();
+  const text=await res.text();
+  return text ? JSON.parse(text) : null;
 }
 async function loadCloudProfile(){
   const pin=document.getElementById('cloudPin').value.trim();
@@ -1077,7 +1078,7 @@ async function loadCloudProfile(){
   setCloudState("Loading...");
   try{
     const rows=await supabaseRequest(`${CLOUD_TABLE}?profile_id=eq.${encodeURIComponent(ACTIVE_PROFILE)}&select=data,updated_at`);
-    if(!rows.length){
+    if(!rows.length||!rows[0].data||!rows[0].data.cipher){
       CLOUD.pin=pin; CLOUD.unlocked=true;
       await saveCloudProfile(true);
       toast("Cloud profile created");
