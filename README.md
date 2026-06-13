@@ -16,12 +16,47 @@ Workout data is private to each browser/device and is stored in `localStorage` u
 Public app files:
 
 - `index.html`
+- `cloud-config.js`
 - `manifest.webmanifest`
 - `sw.js`
 - `.nojekyll`
 - `icons/icon.svg`
+- `supabase.sql`
 
 Do not publish the spreadsheet or `.transcription_crops/`; they are source artifacts, not app files.
+
+## Optional Cloud Sync
+
+Cloud sync uses Supabase as a tiny encrypted backup store. The app still works offline and saves locally first.
+
+Profiles:
+
+- `lucas`
+- `gf`
+
+Each profile uses its own PIN. The PIN is not sent to Supabase; it derives an AES-GCM encryption key in the browser. Supabase stores only encrypted JSON blobs.
+
+This is casual privacy, not full account security. Anyone with the public app configuration could overwrite encrypted blobs if they know the profile IDs. They still cannot read the workout data without the PIN.
+
+### Supabase Setup
+
+1. Create a free Supabase project.
+2. Open **SQL Editor**.
+3. Run the SQL in `supabase.sql`.
+4. Open **Project Settings -> API**.
+5. Copy the project URL and anon public key.
+6. Put them into `cloud-config.js`:
+
+```js
+window.IRONLOG_CLOUD = {
+  supabaseUrl: "https://YOUR_PROJECT.supabase.co",
+  supabaseAnonKey: "YOUR_ANON_PUBLIC_KEY"
+};
+```
+
+7. Commit and push the update.
+
+In the app, open **Data & backup**, choose `Lucas` or `GF`, enter that profile's PIN, then use **Load cloud** or **Save cloud**. After a profile is unlocked, normal changes auto-save encrypted to cloud.
 
 ### GitHub Pages
 

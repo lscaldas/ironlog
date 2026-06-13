@@ -374,7 +374,26 @@
 <div class="sheet" id="dataSheet">
   <div class="grab"></div>
   <h3>Data &amp; backup</h3>
-  <p class="h3sub">Stored locally on this device. Export to back up or move phones.</p>
+  <p class="h3sub">Stored locally first. Cloud sync keeps encrypted profile backups when configured.</p>
+  <div class="card" style="box-shadow:none;margin-bottom:10px;">
+    <div class="card-h"><h2>Profile</h2><div class="sub" id="cloudState">Local only</div></div>
+    <div class="field">
+      <label>Who is training?</label>
+      <select id="profileSelect">
+        <option value="lucas">Lucas</option>
+        <option value="gf">GF</option>
+      </select>
+    </div>
+    <div class="field">
+      <label>Cloud PIN</label>
+      <input id="cloudPin" type="password" inputmode="numeric" autocomplete="current-password" placeholder="PIN for this profile">
+    </div>
+    <div class="row">
+      <button class="ghost" id="cloudLoadBtn" type="button">Load cloud</button>
+      <button class="ghost" id="cloudSaveBtn" type="button">Save cloud</button>
+    </div>
+    <p class="h3sub" id="cloudHelp" style="margin:10px 0 0;">Cloud sync needs Supabase URL/key in cloud-config.js.</p>
+  </div>
   <button class="ghost" id="exportBtn" style="width:100%;margin-bottom:10px;">⬇️ Export data (JSON)</button>
   <button class="ghost" id="importBtn" style="width:100%;margin-bottom:10px;">⬆️ Import data (JSON)</button>
   <input type="file" id="importFile" accept="application/json" style="display:none;">
@@ -385,13 +404,33 @@
 
 <div class="toast" id="toast"></div>
 
+<script src="cloud-config.js"></script>
 <script>
 "use strict";
 /* ================= Storage ================= */
-const KEY="ironlog.v2";
+const LEGACY_KEY="ironlog.v2";
+const KEY_PREFIX="ironlog.v2.";
+const PROFILE_KEY="ironlog.profile";
+let ACTIVE_PROFILE=localStorage.getItem(PROFILE_KEY)||'lucas';
 let DB=load();
-function load(){ try{ const d=JSON.parse(localStorage.getItem(KEY)); if(d&&d.exercises) return d; }catch(e){} return {exercises:[],sets:[]}; }
-function save(){ localStorage.setItem(KEY,JSON.stringify(DB)); }
+function profileKey(){ return KEY_PREFIX+ACTIVE_PROFILE; }
+function load(){
+  try{
+    const d=JSON.parse(localStorage.getItem(profileKey()));
+    if(d&&d.exercises) return d;
+  }catch(e){}
+  if(ACTIVE_PROFILE==='lucas'){
+    try{
+      const d=JSON.parse(localStorage.getItem(LEGACY_KEY));
+      if(d&&d.exercises) return d;
+    }catch(e){}
+  }
+  return {exercises:[],sets:[]};
+}
+function save(){
+  localStorage.setItem(profileKey(),JSON.stringify(DB));
+  queueCloudSave();
+}
 const uid=p=>p+Date.now().toString(36)+Math.random().toString(36).slice(2,5);
 
 /* ================= Dates / weeks (Monday) ================= */
@@ -958,6 +997,162 @@ document.getElementById('seedBtn').onclick=()=>{ seed(false); closeSheets(); toa
 document.getElementById('demoBtn').onclick=()=>{ seed(true); closeSheets(); toast("Sample loaded ✨"); };
 document.getElementById('wipeBtn').onclick=()=>{ if(confirm("Erase ALL data? Cannot be undone.")){ DB={exercises:[],sets:[]}; save(); refreshAll(); closeSheets(); toast("Erased"); } };
 
+/* ================= Cloud sync ================= */
+const CLOUD_TABLE='ironlog_profiles';
+const CLOUD_ITERATIONS=150000;
+const CLOUD={pin:'',unlocked:false,saving:false,pending:false,timer:null,lastSaved:''};
+const enc=new TextEncoder();
+const dec=new TextDecoder();
+function cloudConfig(){
+  const cfg=window.IRONLOG_CLOUD||{};
+  const supabaseUrl=(cfg.supabaseUrl||'').replace(/\/+$/,'');
+  const supabaseAnonKey=cfg.supabaseAnonKey||'';
+  return {supabaseUrl,supabaseAnonKey,enabled:Boolean(supabaseUrl&&supabaseAnonKey)};
+}
+const cloudReady=()=>cloudConfig().enabled && window.crypto && crypto.subtle;
+function bytesToB64(bytes){
+  let s='';
+  new Uint8Array(bytes).forEach(b=>s+=String.fromCharCode(b));
+  return btoa(s);
+}
+function b64ToBytes(b64){
+  const s=atob(b64);
+  const out=new Uint8Array(s.length);
+  for(let i=0;i<s.length;i++) out[i]=s.charCodeAt(i);
+  return out;
+}
+async function deriveCloudKey(pin,saltB64){
+  const material=await crypto.subtle.importKey('raw',enc.encode(pin),'PBKDF2',false,['deriveKey']);
+  return crypto.subtle.deriveKey(
+    {name:'PBKDF2',salt:b64ToBytes(saltB64),iterations:CLOUD_ITERATIONS,hash:'SHA-256'},
+    material,
+    {name:'AES-GCM',length:256},
+    false,
+    ['encrypt','decrypt']
+  );
+}
+async function encryptProfile(pin){
+  const salt=crypto.getRandomValues(new Uint8Array(16));
+  const iv=crypto.getRandomValues(new Uint8Array(12));
+  const saltB64=bytesToB64(salt);
+  const key=await deriveCloudKey(pin,saltB64);
+  const plain={version:2,profileId:ACTIVE_PROFILE,savedAt:new Date().toISOString(),db:DB};
+  const cipher=await crypto.subtle.encrypt(
+    {name:'AES-GCM',iv,additionalData:enc.encode(ACTIVE_PROFILE)},
+    key,
+    enc.encode(JSON.stringify(plain))
+  );
+  return {v:1,alg:'AES-GCM',kdf:'PBKDF2-SHA256',iterations:CLOUD_ITERATIONS,salt:saltB64,iv:bytesToB64(iv),cipher:bytesToB64(cipher)};
+}
+async function decryptProfile(blob,pin){
+  const key=await deriveCloudKey(pin,blob.salt);
+  const plain=await crypto.subtle.decrypt(
+    {name:'AES-GCM',iv:b64ToBytes(blob.iv),additionalData:enc.encode(ACTIVE_PROFILE)},
+    key,
+    b64ToBytes(blob.cipher)
+  );
+  const payload=JSON.parse(dec.decode(plain));
+  if(!payload.db||!payload.db.exercises) throw new Error('Invalid cloud data');
+  return payload.db;
+}
+async function supabaseRequest(path,opts={}){
+  const cfg=cloudConfig();
+  const headers=Object.assign({
+    apikey:cfg.supabaseAnonKey,
+    Authorization:'Bearer '+cfg.supabaseAnonKey,
+    'Content-Type':'application/json'
+  },opts.headers||{});
+  const res=await fetch(cfg.supabaseUrl+'/rest/v1/'+path,Object.assign({},opts,{headers}));
+  if(!res.ok){
+    const text=await res.text().catch(()=>'');
+    throw new Error(text||('Cloud request failed: '+res.status));
+  }
+  if(res.status===204) return null;
+  return res.json();
+}
+async function loadCloudProfile(){
+  const pin=document.getElementById('cloudPin').value.trim();
+  if(!cloudReady()){ toast("Cloud not configured"); updateCloudUI(); return; }
+  if(!pin){ toast("Enter profile PIN"); return; }
+  setCloudState("Loading...");
+  try{
+    const rows=await supabaseRequest(`${CLOUD_TABLE}?profile_id=eq.${encodeURIComponent(ACTIVE_PROFILE)}&select=data,updated_at`);
+    if(!rows.length){
+      CLOUD.pin=pin; CLOUD.unlocked=true;
+      await saveCloudProfile(true);
+      toast("Cloud profile created");
+      return;
+    }
+    DB=await decryptProfile(rows[0].data,pin);
+    CLOUD.pin=pin; CLOUD.unlocked=true;
+    normalizeDB();
+    save();
+    refreshAll();
+    toast("Cloud loaded");
+  }catch(err){
+    CLOUD.unlocked=false;
+    toast(err.name==='OperationError'?"Wrong PIN":"Cloud load failed");
+  }
+  updateCloudUI();
+}
+async function saveCloudProfile(manual=false){
+  const pin=(CLOUD.pin||document.getElementById('cloudPin').value||'').trim();
+  if(!cloudReady()){ if(manual) toast("Cloud not configured"); updateCloudUI(); return; }
+  if(!pin){ if(manual) toast("Enter profile PIN"); return; }
+  if(CLOUD.saving){ CLOUD.pending=true; return; }
+  CLOUD.saving=true;
+  setCloudState("Saving...");
+  try{
+    const data=await encryptProfile(pin);
+    await supabaseRequest(`${CLOUD_TABLE}?on_conflict=profile_id`,{
+      method:'POST',
+      headers:{Prefer:'resolution=merge-duplicates'},
+      body:JSON.stringify([{profile_id:ACTIVE_PROFILE,data}])
+    });
+    CLOUD.pin=pin; CLOUD.unlocked=true; CLOUD.lastSaved=new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
+    if(manual) toast("Cloud saved");
+  }catch(err){
+    if(manual) toast("Cloud save failed");
+  }finally{
+    CLOUD.saving=false;
+    updateCloudUI();
+    if(CLOUD.pending){ CLOUD.pending=false; queueCloudSave(250); }
+  }
+}
+function queueCloudSave(delay=900){
+  if(!CLOUD.unlocked||!cloudReady()) return;
+  clearTimeout(CLOUD.timer);
+  CLOUD.timer=setTimeout(()=>saveCloudProfile(false),delay);
+}
+function setCloudState(text){ document.getElementById('cloudState').textContent=text; }
+function updateCloudUI(){
+  document.getElementById('profileSelect').value=ACTIVE_PROFILE;
+  if(!cloudConfig().enabled){
+    setCloudState("Local only");
+    document.getElementById('cloudHelp').textContent="Cloud sync needs Supabase URL/key in cloud-config.js.";
+    return;
+  }
+  document.getElementById('cloudHelp').textContent=CLOUD.unlocked
+    ? "Unlocked. Local changes auto-save encrypted to cloud."
+    : "Enter this profile's PIN, then load or save cloud.";
+  setCloudState(CLOUD.unlocked ? `Cloud on${CLOUD.lastSaved?' · '+CLOUD.lastSaved:''}` : "Locked");
+}
+function switchProfile(profile){
+  if(profile===ACTIVE_PROFILE) return;
+  ACTIVE_PROFILE=profile;
+  localStorage.setItem(PROFILE_KEY,ACTIVE_PROFILE);
+  CLOUD.pin=''; CLOUD.unlocked=false; CLOUD.lastSaved='';
+  document.getElementById('cloudPin').value='';
+  DB=load();
+  normalizeDB();
+  if(!DB.exercises.length) seed(false); else refreshAll();
+  updateCloudUI();
+  toast("Profile switched");
+}
+document.getElementById('profileSelect').onchange=e=>switchProfile(e.target.value);
+document.getElementById('cloudLoadBtn').onclick=loadCloudProfile;
+document.getElementById('cloudSaveBtn').onclick=()=>saveCloudProfile(true);
+
 function seed(withHistory){
   DB={exercises:SEED.map(s=>({id:uid('e'),...s})), sets:[]};
   if(withHistory){
@@ -1055,6 +1250,7 @@ window.addEventListener('resize',()=>{ if(document.getElementById('v-stats').cla
 normalizeDB();
 if(!DB.exercises.length){ seed(false); }
 refreshAll();
+updateCloudUI();
 
 if('serviceWorker' in navigator){
   window.addEventListener('load',()=>{
