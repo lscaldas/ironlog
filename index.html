@@ -227,13 +227,6 @@
   .mbar{background:var(--bg2);border-radius:6px;height:14px;overflow:hidden;}
   .mbar i{display:block;height:100%;border-radius:6px;transition:width .3s;}
   .mct{width:46px;text-align:right;font-weight:700;font-variant-numeric:tabular-nums;color:var(--txt);}
-  .mmeta{grid-column:2 / 4;display:flex;gap:6px;flex-wrap:wrap;margin-top:-5px;}
-  .mchip{background:#101722;border:1px solid rgba(255,255,255,.06);color:var(--muted);border-radius:999px;
-    padding:4px 7px;font-size:10.5px;font-weight:700;font-variant-numeric:tabular-nums;}
-  .mchip b{color:var(--txt);}
-  .mchip.good b{color:var(--good);}
-  .mchip.warn b{color:var(--accent2);}
-  .mchip.note{border-color:rgba(255,189,90,.22);}
   .mrow.ignored .mname,.mrow.ignored .mct{color:var(--accent);}
 
   @media (min-width:900px){
@@ -767,11 +760,9 @@ function renderMuscleBalance(mk){
   document.querySelectorAll('#mbalMode button').forEach(b=>b.classList.toggle('on',b.dataset.m===MBAL_MODE));
   const isEff=MBAL_MODE==='effective';
   const totalDone=data.reduce((a,r)=>a+r.done,0), totalTarget=data.reduce((a,r)=>a+r.target,0);
-  const missed=data.filter(r=>r.target>0&&r.done===0).map(r=>r.muscle);
-  const missedTxt=missed.length>2?` · ${missed.length} untouched`:missed.length?` · no ${missed.join(', ')}`:'';
   document.getElementById('mbalSub').textContent=isEff
-    ? `effective sets · rec min is weekly sets`
-    : (totalTarget?`${totalDone}/${totalTarget} planned sets${missedTxt}`:'');
+    ? `effective sets / recommended min weekly sets`
+    : (totalTarget?`${totalDone}/${totalTarget} planned sets`:'');
   const max=Math.max(1,...data.map(r=>isEff?Math.max(r.effective,recMin(r.muscle)):Math.max(r.done,r.target)));
   document.getElementById('mbalList').innerHTML=data.length?data.map(r=>{
     const eff=Math.round(r.effective*10)/10;
@@ -780,16 +771,11 @@ function renderMuscleBalance(mk){
     const target=isEff?rec:r.target;
     const pct=Math.max(3,Math.min(100,value/max*100));
     const cls=target>0&&value===0?' ignored':'';
-    const color=value>=target?'var(--good)':'var(--blue)';
+    const color=value>=target?'var(--good)':value>0?'var(--blue)':'var(--accent)';
     return `<div class="mrow${cls}" title="${r.actual} direct logged set${r.actual===1?'':'s'} this week">
       <div class="mname">${esc(r.muscle)}</div>
       <div class="mbar"><i style="width:${pct}%;background:${color}"></i></div>
       <div class="mct">${fmtEff(value)}/${target}</div>
-      <div class="mmeta">
-        ${isEff
-          ? `<span class="mchip ${eff>=rec?'good':'warn'}">effective <b>${fmtEff(eff)}</b></span><span class="mchip note">rec min <b>${rec}</b></span>`
-          : `<span class="mchip">direct <b>${r.done}/${r.target}</b></span><span class="mchip">effective <b>${fmtEff(eff)}</b></span>`}
-      </div>
     </div>`;
   }).join(''):`<div class="sub">Add exercises to see weekly muscle balance.</div>`;
 }
