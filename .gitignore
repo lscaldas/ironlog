@@ -1,0 +1,4 @@
+.transcription_crops/
+*.xlsx
+server.out
+server.err

@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="IronLog">
+  <defs>
+    <linearGradient id="bg" x1="72" y1="64" x2="440" y2="448" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#ff5a3c"/>
+      <stop offset="1" stop-color="#ffb03c"/>
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="18" stdDeviation="18" flood-color="#000000" flood-opacity="0.28"/>
+    </filter>
+  </defs>
+  <rect width="512" height="512" rx="116" fill="#0b0f17"/>
+  <rect x="48" y="48" width="416" height="416" rx="96" fill="url(#bg)" filter="url(#shadow)"/>
+  <path d="M155 276h202" stroke="#ffffff" stroke-width="42" stroke-linecap="round"/>
+  <path d="M112 226v100M400 226v100" stroke="#ffffff" stroke-width="42" stroke-linecap="round"/>
+  <path d="M206 179h100c35 0 63 28 63 63v100" fill="none" stroke="#0b0f17" stroke-opacity="0.88" stroke-width="30" stroke-linecap="round"/>
+  <circle cx="206" cy="179" r="24" fill="#0b0f17" fill-opacity="0.88"/>
+</svg>
