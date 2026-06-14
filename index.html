@@ -1207,10 +1207,8 @@ function setPrimaryMuscle(muscle){
   document.getElementById('fMuscle').value=muscle||'Other';
   const bucket=document.getElementById('fBucket');
   if(!bucket.value.trim()||['Upper','Arms','Legs','Core','Other'].includes(bucket.value.trim())) bucket.value=MUSCLE_REGION[muscle]||'Other';
-  const areas=areaOptionsForMuscle(muscle);
-  const current=document.getElementById('fArea').value.trim();
   if(muscle==='Other') document.getElementById('fArea').value='Other';
-  else if(current&&!areas.includes(current)) document.getElementById('fArea').value='';
+  else document.getElementById('fArea').value='';
   EX_CHOICES_OPEN=false;
   renderBodyChoices();
   renderExerciseChoices();
