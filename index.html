@@ -202,6 +202,11 @@
   .sheet.show{transform:translateY(0);}
   .grab{width:40px;height:4px;background:var(--line);border-radius:3px;margin:0 auto 14px;}
   .sheet h3{margin:0 0 4px;font-size:18px;} .sheet .h3sub{margin:0 0 16px;font-size:12.5px;color:var(--muted);}
+  .sheet-title{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:4px;}
+  .sheet-title h3{margin:0;}
+  .sheet-close{width:34px;height:34px;border-radius:10px;border:1px solid var(--line);background:var(--card2);
+    color:var(--muted);font-size:18px;font-weight:850;line-height:1;cursor:pointer;flex-shrink:0;}
+  .sheet-close:active{background:var(--accent);border-color:transparent;color:#fff;}
   .toast{position:fixed;bottom:96px;left:50%;transform:translateX(-50%) translateY(20px);background:#1d2736;border:1px solid rgba(255,255,255,.08);
     color:var(--txt);padding:11px 18px;border-radius:999px;font-size:13.5px;font-weight:700;z-index:200;opacity:0;transition:.3s;box-shadow:var(--shadow);pointer-events:none;white-space:nowrap;}
   .toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
@@ -454,7 +459,10 @@
 <!-- Edit exercise sheet -->
 <div class="sheet" id="exSheet">
   <div class="grab"></div>
-  <h3 id="exTitle">Add exercise</h3>
+  <div class="sheet-title">
+    <h3 id="exTitle">Add exercise</h3>
+    <button class="sheet-close" id="cancelExBtn" type="button" title="Cancel">x</button>
+  </div>
   <p class="h3sub">Set a weekly set target. Double progression: hit the top of your rep range, then add weight.</p>
   <input id="fMuscle" type="hidden">
   <input id="fArea" type="hidden">
@@ -1173,6 +1181,7 @@ function openEx(e){
   openSheet('exSheet');
 }
 document.getElementById('addExBtn').onclick=()=>openEx(null);
+document.getElementById('cancelExBtn').onclick=closeSheets;
 function areaOptionsForMuscle(muscle){
   const current=document.getElementById('fArea').value.trim();
   if(!muscle) return current?[current]:[];
