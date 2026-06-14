@@ -68,6 +68,11 @@
   .bucket-h h2{font-size:13px;margin:0;font-weight:800;letter-spacing:.8px;text-transform:uppercase;color:var(--muted);}
   .bucket-h .ln{flex:1;height:1px;background:var(--line);}
   .bucket-h .bcount{font-size:11px;color:var(--dim);}
+  .group-toggle{background:var(--card2);border:1px solid var(--line);color:var(--muted);border-radius:999px;
+    padding:5px 8px;font-size:11px;font-weight:800;cursor:pointer;line-height:1;}
+  .group-toggle.on{color:var(--txt);border-color:rgba(105,167,255,.45);background:rgba(105,167,255,.12);}
+  .group-section.collapsed .ex{display:none;}
+  .group-section.collapsed .bucket-h{margin-bottom:12px;}
 
   /* Exercise card */
   .ex{background:linear-gradient(180deg,rgba(21,30,43,.98),rgba(18,26,38,.98));border:1px solid rgba(255,255,255,.06);
@@ -848,6 +853,8 @@ bg.onclick=closeSheets;
 let GMODE=localStorage.getItem('ironlog.gmode')||'muscle';
 if(GMODE==='program'||GMODE==='area') GMODE='muscle';
 let MBAL_MODE=localStorage.getItem('ironlog.mbalMode')||'plan';
+let GROUP_VIS={};
+try{ GROUP_VIS=JSON.parse(localStorage.getItem('ironlog.groupVis')||'{}')||{}; }catch{ GROUP_VIS={}; }
 const GROUP_ORDER={ region:['Upper','Lower','Core','Other'], ppl:['Push','Pull','Legs','Core','Other'], muscle:MUSCLES.concat(['Other']), area:AREAS.concat(['Other']) };
 function groupOf(ex,mode){
   const m=muscleOf(ex); if(!m) return 'Other';
@@ -874,6 +881,16 @@ function groupProgress(items,mk){
   let done=0,target=0;
   items.forEach(e=>{ done+=Math.min(setsFor(e.id,mk).length,e.target); target+=e.target; });
   return {done,target};
+}
+function groupVisKey(mode,name){ return `${mode}:${name}`; }
+function isGroupVisible(mode,name){ return GROUP_VIS[groupVisKey(mode,name)]!==false; }
+function setGroupVisible(mode,name,val){
+  GROUP_VIS[groupVisKey(mode,name)]=!!val;
+  localStorage.setItem('ironlog.groupVis',JSON.stringify(GROUP_VIS));
+}
+function toggleGroup(mode,name){
+  setGroupVisible(mode,name,!isGroupVisible(mode,name));
+  renderWeek();
 }
 function sortForWeek(items,mk){
   return items.slice().sort((a,b)=>{
@@ -964,9 +981,11 @@ function renderWeek(){
   groups.forEach(([b,rawItems])=>{
     const items=sortForWeek(rawItems,mk);
     const {done:bd,target:bt}=groupProgress(items,mk);
-    const section=document.createElement('div'); section.className='group-section';
+    const visible=isGroupVisible(GMODE,b);
+    const section=document.createElement('div'); section.className='group-section'+(visible?'':' collapsed');
     const head=document.createElement('div'); head.className='bucket-h';
-    head.innerHTML=`<h2>${esc(b)}</h2><div class="ln"></div><div class="bcount">${bd}/${bt}</div>`;
+    head.innerHTML=`<h2>${esc(b)}</h2><div class="ln"></div><div class="bcount">${bd}/${bt}</div><button class="group-toggle ${visible?'on':''}" type="button">${visible?'Hide':'Show'}</button>`;
+    head.querySelector('.group-toggle').onclick=()=>toggleGroup(GMODE,b);
     section.appendChild(head);
     items.forEach(e=>section.appendChild(exCard(e,mk)));
     wl.appendChild(section);
