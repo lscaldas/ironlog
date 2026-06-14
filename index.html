@@ -1218,15 +1218,22 @@ function setPrimaryMuscle(muscle){
 }
 function setAreaChoice(area){
   document.getElementById('fArea').value=area||'Other';
+  EX_CHOICES_OPEN=false;
   renderAreaChoices();
+  renderExerciseChoices();
   updateMatchHint();
 }
 function selectedMuscleChoices(){
   const m=document.getElementById('fMuscle').value.trim();
+  const area=document.getElementById('fArea').value.trim();
   const entries=catalogEntries();
   if(!m) return [];
   if(m==='Other') return entries;
   const primary=entries.filter(x=>x.muscle===m);
+  if(area&&area!=='Other'){
+    const areaMatches=primary.filter(x=>x.area===area);
+    if(areaMatches.length) return areaMatches;
+  }
   return primary.length?primary:entries;
 }
 function renderExerciseChoices(){
