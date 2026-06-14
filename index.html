@@ -53,9 +53,15 @@
   .ring .inner{width:60px;height:60px;border-radius:50%;background:#101722;display:grid;place-items:center;text-align:center;border:1px solid rgba(255,255,255,.05);}
   .ring .inner b{font-size:19px;font-weight:850;line-height:1;}
   .ring .inner span{font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;}
-  .hero-info{flex:1;}
+  .hero-info{flex:1;min-width:0;}
   .hero-info .wk{font-size:13px;color:var(--muted);}
   .hero-info .big{font-size:18px;font-weight:850;margin:3px 0 8px;}
+  .hero-tier{display:flex;flex-direction:column;gap:5px;flex-shrink:0;}
+  .hero-tier .tchip{display:flex;align-items:center;gap:6px;background:var(--bg2);border:1px solid var(--line);
+    color:var(--muted);padding:6px 10px;border-radius:9px;font-size:11px;font-weight:800;cursor:pointer;
+    white-space:nowrap;text-align:left;transition:background .15s,color .15s,border-color .15s;}
+  .hero-tier .tchip:active{transform:scale(.97);}
+  .hero-tier .tchip.on{background:var(--accent);color:#fff;border-color:transparent;}
   .hbars{display:flex;gap:5px;}
   .hbar{flex:1;height:6px;border-radius:3px;background:var(--bg2);overflow:hidden;}
   .hbar i{display:block;height:100%;background:linear-gradient(90deg,var(--accent),var(--accent2));border-radius:3px;}
@@ -342,6 +348,11 @@
       <div class="hero-info">
         <div class="wk" id="weekLabel">This week</div>
         <div class="big" id="weekHead">Let's get those sets in</div>
+      </div>
+      <div class="hero-tier" id="tierSeg" title="Training week — scales recommended sets">
+        <button class="tchip" data-t="maintain">🍃 Maintaining</button>
+        <button class="tchip" data-t="build">💪 Building</button>
+        <button class="tchip" data-t="beast">🔥 Beast mode</button>
       </div>
     </div>
 
@@ -780,11 +791,28 @@ const muscleOf=ex=>ex.muscle||guessMuscle(ex.name)||'';
 function guessArea(name){ return exerciseMatch(name)?.area||''; }
 const areaOf=ex=>ex.area||guessArea(ex.name)||muscleOf(ex)||'Other';
 const pplOf=ex=>AREA_PPL[areaOf(ex)]||MUSCLE_PPL[muscleOf(ex)]||'Other';
-const REC_MIN_SETS={
-  Chest:8, Back:8, Shoulders:6, Traps:4, Biceps:6, Triceps:6,
-  Forearms:4, Quads:8, Hamstrings:6, Glutes:6, Calves:6, Core:4, Other:6
+/* Recommended weekly sets per muscle, by training-week intensity tier.
+   Grounded in hypertrophy volume literature (Schoenfeld et al.; Renaissance
+   Periodization MV/MEV/MAV landmarks, current as of 2026):
+   - maintain ≈ Maintenance Volume (keep what you have on a light week)
+   - build    ≈ MEV→MAV growth zone (the app's long-standing default)
+   - beast    ≈ upper MAV — high but still recoverable productive volume */
+const REC_SETS_TIERS={
+  maintain:{ Chest:4, Back:4, Shoulders:3, Traps:2, Biceps:3, Triceps:3,
+    Forearms:2, Quads:4, Hamstrings:3, Glutes:3, Calves:3, Core:2, Other:3 },
+  build:{ Chest:8, Back:8, Shoulders:6, Traps:4, Biceps:6, Triceps:6,
+    Forearms:4, Quads:8, Hamstrings:6, Glutes:6, Calves:6, Core:4, Other:6 },
+  beast:{ Chest:14, Back:14, Shoulders:12, Traps:8, Biceps:12, Triceps:12,
+    Forearms:8, Quads:14, Hamstrings:12, Glutes:12, Calves:10, Core:8, Other:12 }
 };
-function recMin(muscle){ return REC_MIN_SETS[muscle]||REC_MIN_SETS.Other; }
+const TIER_META={
+  maintain:{label:'Maintaining', icon:'🍃'},
+  build:{label:'Building', icon:'💪'},
+  beast:{label:'Beast mode', icon:'🔥'}
+};
+let TRAINING_TIER=localStorage.getItem('ironlog.tier');
+if(!REC_SETS_TIERS[TRAINING_TIER]) TRAINING_TIER='build';
+function recMin(muscle){ const t=REC_SETS_TIERS[TRAINING_TIER]||REC_SETS_TIERS.build; return t[muscle]||t.Other; }
 function secondaryMuscles(ex){
   if(ex.secondary&&Object.keys(ex.secondary).length) return {...ex.secondary};
   if(ex.match?.secondary&&Object.keys(ex.match.secondary).length) return {...ex.match.secondary};
@@ -938,6 +966,7 @@ function sortForWeek(items,mk){
 }
 function renderGroupChips(){
   document.querySelectorAll('#groupSeg .gchip').forEach(b=>b.classList.toggle('on',b.dataset.g===GMODE));
+  document.querySelectorAll('#tierSeg .tchip').forEach(b=>b.classList.toggle('on',b.dataset.t===TRAINING_TIER));
 }
 function renderMuscleBalance(mk){
   const rows={};
@@ -964,7 +993,7 @@ function renderMuscleBalance(mk){
   const isEff=MBAL_MODE==='effective';
   const totalDone=data.reduce((a,r)=>a+r.done,0), totalTarget=data.reduce((a,r)=>a+r.target,0);
   document.getElementById('mbalSub').textContent=isEff
-    ? `effective sets / recommended min weekly sets`
+    ? `effective sets / ${TIER_META[TRAINING_TIER].label} recommended`
     : (totalTarget?`${totalDone}/${totalTarget} planned sets`:'');
   document.getElementById('mbalList').innerHTML=data.length?data.map(r=>{
     const eff=Math.round(r.effective*10)/10;
@@ -982,6 +1011,14 @@ function renderMuscleBalance(mk){
     </div>`;
   }).join(''):`<div class="sub">Add exercises to see weekly muscle balance.</div>`;
 }
+document.querySelectorAll('#tierSeg .tchip').forEach(b=>b.onclick=()=>{
+  TRAINING_TIER=b.dataset.t; localStorage.setItem('ironlog.tier',TRAINING_TIER);
+  // Surface the effect: jump to the effective view where recommended sets live.
+  MBAL_MODE='effective'; localStorage.setItem('ironlog.mbalMode',MBAL_MODE);
+  document.getElementById('mbalCard').classList.remove('closed');
+  renderWeek();
+  toast(`${TIER_META[TRAINING_TIER].icon} ${TIER_META[TRAINING_TIER].label} week`);
+});
 document.querySelectorAll('#groupSeg .gchip').forEach(b=>b.onclick=()=>{
   GMODE=b.dataset.g; localStorage.setItem('ironlog.gmode',GMODE); renderWeek();
 });
