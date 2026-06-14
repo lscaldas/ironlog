@@ -95,6 +95,18 @@
   .ex-suggestions button{background:var(--card2);border:1px solid var(--line);color:var(--txt);border-radius:999px;
     padding:7px 9px;font-size:11.5px;font-weight:700;cursor:pointer;}
   .ex-suggestions button:active{background:var(--accent);border-color:transparent;color:#fff;}
+  .ex-suggestions.expanded{max-height:220px;overflow:auto;padding-right:2px;}
+  .input-combo{display:flex;gap:8px;align-items:stretch;}
+  .input-combo input{flex:1;min-width:0;}
+  .drop-btn{width:48px;flex-shrink:0;background:var(--card2);border:1px solid var(--line);color:var(--txt);
+    border-radius:10px;font-size:15px;font-weight:850;cursor:pointer;}
+  .body-choices{display:flex;flex-wrap:wrap;gap:6px;}
+  .body-choices.compact{max-height:116px;overflow:auto;padding-right:2px;}
+  .body-chip{background:var(--bg2);border:1px solid var(--line);color:var(--muted);border-radius:10px;
+    padding:8px 9px;font-size:12px;font-weight:750;cursor:pointer;}
+  .body-chip.on{background:rgba(105,167,255,.14);border-color:rgba(105,167,255,.5);color:var(--txt);}
+  .body-chip:active{background:var(--accent);border-color:transparent;color:#fff;}
+  .choice-help{font-size:11.5px;color:var(--muted);margin:7px 0 0 2px;line-height:1.3;}
   .dots{display:flex;gap:4px;flex-wrap:wrap;align-items:center;}
   .dot{width:18px;height:18px;border-radius:5px;border:1.5px solid var(--line);background:var(--bg2);
     display:grid;place-items:center;font-size:9px;color:var(--dim);transition:.15s;}
@@ -136,6 +148,7 @@
     font-size:15px;padding:13px;border-radius:10px;width:100%;cursor:pointer;box-shadow:0 8px 18px rgba(255,103,71,.26);}
   button.ghost{background:var(--card2);border:1px solid var(--line);color:var(--txt);font-weight:680;padding:11px;border-radius:10px;cursor:pointer;font-size:14px;}
   .btn-sm{padding:8px 12px;font-size:13px;border-radius:9px;}
+  .pin-change{border-top:1px solid var(--line);margin-top:12px;padding-top:12px;}
 
   .empty{text-align:center;padding:30px 16px;color:var(--dim);}
   .empty .big{font-size:36px;margin-bottom:8px;opacity:.6;}
@@ -443,11 +456,18 @@
   <div class="grab"></div>
   <h3 id="exTitle">Add exercise</h3>
   <p class="h3sub">Set a weekly set target. Double progression: hit the top of your rep range, then add weight.</p>
-  <div class="row">
-    <div class="field"><label>Muscle group</label><input id="fMuscle" list="muDL" placeholder="e.g. Back" autocomplete="off"><datalist id="muDL"></datalist></div>
-    <div class="field"><label>Area / head</label><input id="fArea" list="arDL" placeholder="e.g. Rear delts" autocomplete="off"><datalist id="arDL"></datalist></div>
+  <input id="fMuscle" type="hidden">
+  <input id="fArea" type="hidden">
+  <div class="field">
+    <label>Primary muscle</label>
+    <div class="body-choices" id="muscleChoices"></div>
   </div>
-  <div class="field"><label>Exercise name</label><input id="fName" list="exDL" placeholder="Select or type custom" autocomplete="off"><datalist id="exDL"></datalist></div>
+  <div class="field">
+    <label>Area / head</label>
+    <div class="body-choices compact" id="areaChoices"></div>
+    <div class="choice-help" id="areaHelp"></div>
+  </div>
+  <div class="field"><label>Exercise name</label><div class="input-combo"><input id="fName" list="exDL" placeholder="Select or type custom" autocomplete="off"><button class="drop-btn" id="exDropBtn" type="button" title="Show more exercise choices">v</button></div><datalist id="exDL"></datalist></div>
   <div class="ex-suggestions" id="exSuggestList"></div>
   <div class="form-hint" id="matchHint"></div>
   <div class="row">
@@ -486,6 +506,15 @@
       <button class="ghost" id="cloudSaveBtn" type="button">Save cloud</button>
     </div>
     <p class="h3sub" id="cloudHelp" style="margin:10px 0 0;">Cloud sync needs Supabase URL/key in cloud-config.js.</p>
+    <div class="pin-change">
+      <label>Change cloud PIN</label>
+      <div class="row">
+        <div class="field"><input id="oldCloudPin" type="password" inputmode="numeric" autocomplete="current-password" placeholder="Old PIN"></div>
+        <div class="field"><input id="newCloudPin" type="password" inputmode="numeric" autocomplete="new-password" placeholder="New PIN"></div>
+      </div>
+      <button class="ghost" id="changePinBtn" type="button" style="width:100%;">Change PIN</button>
+      <p class="h3sub" id="pinChangeMsg" style="margin:10px 0 0;"></p>
+    </div>
   </div>
   <button class="ghost" id="exportBtn" style="width:100%;margin-bottom:10px;">⬇️ Export data (JSON)</button>
   <button class="ghost" id="importBtn" style="width:100%;margin-bottom:10px;">⬆️ Import data (JSON)</button>
@@ -929,13 +958,13 @@ function renderMuscleBalance(mk){
   document.getElementById('mbalSub').textContent=isEff
     ? `effective sets / recommended min weekly sets`
     : (totalTarget?`${totalDone}/${totalTarget} planned sets`:'');
-  const max=Math.max(1,...data.map(r=>isEff?Math.max(r.effective,recMin(r.muscle)):Math.max(r.done,r.target)));
   document.getElementById('mbalList').innerHTML=data.length?data.map(r=>{
     const eff=Math.round(r.effective*10)/10;
     const rec=recMin(r.muscle);
     const value=isEff?eff:r.done;
     const target=isEff?rec:r.target;
-    const pct=Math.max(3,Math.min(100,value/max*100));
+    const rawPct=target>0?value/target*100:0;
+    const pct=value>0?Math.max(3,Math.min(100,rawPct)):3;
     const cls=target>0&&value===0?' ignored':'';
     const color=value>=target?'var(--good)':value>0?'var(--blue)':'var(--accent)';
     return `<div class="mrow${cls}" title="${r.actual} direct logged set${r.actual===1?'':'s'} this week">
@@ -1122,8 +1151,10 @@ document.getElementById('finDoneBtn').onclick=()=>{ closeSheets(); renderHistory
 
 /* ================= Add / edit exercise ================= */
 let editEx=null;
+let EX_CHOICES_OPEN=false;
 function openEx(e){
   editEx=e||null;
+  EX_CHOICES_OPEN=false;
   document.getElementById('exTitle').textContent=e?'Edit exercise':'Add exercise';
   document.getElementById('fName').value=e?e.name:'';
   document.getElementById('fMuscle').value=e?muscleOf(e):'';
@@ -1135,27 +1166,82 @@ function openEx(e){
   document.getElementById('fInc').value=e?e.inc:2.5;
   document.getElementById('fNotes').value=e?(e.notes||''):'';
   document.getElementById('delExBtn').style.display=e?'block':'none';
-  // datalists
-  document.getElementById('muDL').innerHTML=MUSCLES.concat(['Other']).map(m=>`<option value="${m}">`).join('');
-  document.getElementById('arDL').innerHTML=AREAS.concat(['Other']).map(a=>`<option value="${a}">`).join('');
   document.getElementById('bkDL').innerHTML=[...new Set(DB.exercises.map(x=>x.bucket).concat(['Upper','Arms','Legs','Core']))].map(b=>`<option value="${b}">`).join('');
+  renderBodyChoices();
   renderExerciseChoices();
   updateMatchHint();
   openSheet('exSheet');
 }
 document.getElementById('addExBtn').onclick=()=>openEx(null);
+function areaOptionsForMuscle(muscle){
+  const current=document.getElementById('fArea').value.trim();
+  if(!muscle) return current?[current]:[];
+  const fromCatalog=catalogEntries().filter(x=>x.muscle===muscle).map(x=>x.area).filter(Boolean);
+  const out=[...new Set(fromCatalog.concat(current? [current]:[],['Other']))];
+  return out.filter(Boolean);
+}
+function renderBodyChoices(){
+  const current=document.getElementById('fMuscle').value.trim();
+  const muscles=MUSCLES.concat(['Other']);
+  const muscleBox=document.getElementById('muscleChoices');
+  muscleBox.innerHTML=muscles.map(m=>`<button type="button" class="body-chip ${m===current?'on':''}" data-muscle="${esc(m)}">${esc(m)}</button>`).join('');
+  muscleBox.querySelectorAll('button').forEach(btn=>btn.onclick=()=>setPrimaryMuscle(btn.dataset.muscle));
+  renderAreaChoices();
+}
+function renderAreaChoices(){
+  const muscle=document.getElementById('fMuscle').value.trim();
+  const current=document.getElementById('fArea').value.trim();
+  const areaBox=document.getElementById('areaChoices');
+  const help=document.getElementById('areaHelp');
+  const areas=areaOptionsForMuscle(muscle);
+  if(!muscle){
+    areaBox.innerHTML='';
+    help.textContent='Pick a primary muscle to narrow the exercise list.';
+    return;
+  }
+  areaBox.innerHTML=areas.map(a=>`<button type="button" class="body-chip ${a===current?'on':''}" data-area="${esc(a)}">${esc(a)}</button>`).join('');
+  areaBox.querySelectorAll('button').forEach(btn=>btn.onclick=()=>setAreaChoice(btn.dataset.area));
+  help.textContent=current?`${muscle} / ${current}`:`Choose the area that best fits this exercise.`;
+}
+function setPrimaryMuscle(muscle){
+  document.getElementById('fMuscle').value=muscle||'Other';
+  const bucket=document.getElementById('fBucket');
+  if(!bucket.value.trim()||['Upper','Arms','Legs','Core','Other'].includes(bucket.value.trim())) bucket.value=MUSCLE_REGION[muscle]||'Other';
+  const areas=areaOptionsForMuscle(muscle);
+  const current=document.getElementById('fArea').value.trim();
+  if(muscle==='Other') document.getElementById('fArea').value='Other';
+  else if(current&&!areas.includes(current)) document.getElementById('fArea').value='';
+  EX_CHOICES_OPEN=false;
+  renderBodyChoices();
+  renderExerciseChoices();
+  updateMatchHint();
+}
+function setAreaChoice(area){
+  document.getElementById('fArea').value=area||'Other';
+  renderAreaChoices();
+  updateMatchHint();
+}
 function selectedMuscleChoices(){
   const m=document.getElementById('fMuscle').value.trim();
   const entries=catalogEntries();
-  if(!m||m==='Other') return entries;
+  if(!m) return [];
+  if(m==='Other') return entries;
   const primary=entries.filter(x=>x.muscle===m);
   return primary.length?primary:entries;
 }
 function renderExerciseChoices(){
   const entries=selectedMuscleChoices();
-  document.getElementById('exDL').innerHTML=entries.map(x=>`<option value="${esc(x.name)}">`).join('');
+  const allEntries=catalogEntries();
+  document.getElementById('exDL').innerHTML=(entries.length?entries:allEntries).map(x=>`<option value="${esc(x.name)}">`).join('');
   const box=document.getElementById('exSuggestList');
-  const top=entries.slice(0,10);
+  box.classList.toggle('expanded',EX_CHOICES_OPEN);
+  document.getElementById('exDropBtn').textContent=EX_CHOICES_OPEN?'Less':'More';
+  document.getElementById('exDropBtn').title=EX_CHOICES_OPEN?'Show fewer exercise choices':'Show more exercise choices';
+  if(!entries.length){
+    box.innerHTML='<span class="sub">Choose a primary muscle, then pick one of the matching exercises or type your own.</span>';
+    return;
+  }
+  const top=EX_CHOICES_OPEN?entries:entries.slice(0,8);
   box.innerHTML=top.map(x=>`<button type="button" data-ex="${esc(x.name)}">${esc(x.name)}</button>`).join('');
   box.querySelectorAll('button').forEach(btn=>btn.onclick=()=>{
     chooseCatalogExercise(btn.dataset.ex);
@@ -1168,6 +1254,7 @@ function chooseCatalogExercise(name){
   document.getElementById('fArea').value=entry.area;
   const bucket=document.getElementById('fBucket');
   if(!bucket.value.trim()||['Upper','Arms','Legs','Core','Other'].includes(bucket.value.trim())) bucket.value=MUSCLE_REGION[entry.muscle]||bucket.value||'Other';
+  renderBodyChoices();
   renderExerciseChoices();
   updateMatchHint();
 }
@@ -1188,13 +1275,15 @@ function inferNameFields(){
   const match=exerciseMatch(name);
   const m=document.getElementById('fMuscle');
   const a=document.getElementById('fArea');
+  let changed=false;
   if(match){
-    if(!m.value.trim()) m.value=match.muscle;
-    if(!a.value.trim()) a.value=match.area;
+    if(!m.value.trim()){ m.value=match.muscle; changed=true; }
+    if(!a.value.trim()){ a.value=match.area; changed=true; }
   }else{
-    if(!m.value.trim()) m.value=guessMuscle(name);
-    if(!a.value.trim()) a.value=guessArea(name);
+    if(!m.value.trim()){ m.value=guessMuscle(name); changed=true; }
+    if(!a.value.trim()){ a.value=guessArea(name); changed=true; }
   }
+  if(changed){ renderBodyChoices(); renderExerciseChoices(); }
   updateMatchHint();
 }
 document.getElementById('fName').oninput=()=>{ inferNameFields(); };
@@ -1202,8 +1291,7 @@ document.getElementById('fName').onchange=()=>{
   const entry=catalogEntries().find(x=>normName(x.name)===normName(document.getElementById('fName').value.trim()));
   if(entry) chooseCatalogExercise(entry.name); else inferNameFields();
 };
-document.getElementById('fMuscle').oninput=()=>{ renderExerciseChoices(); };
-document.getElementById('fMuscle').onchange=()=>{ renderExerciseChoices(); };
+document.getElementById('exDropBtn').onclick=()=>{ EX_CHOICES_OPEN=!EX_CHOICES_OPEN; renderExerciseChoices(); };
 document.getElementById('saveExBtn').onclick=()=>{
   const name=document.getElementById('fName').value.trim(); if(!name){ toast("Name it"); return; }
   const obj={ name, muscle:(document.getElementById('fMuscle').value.trim()||guessMuscle(name)||'Other'),
@@ -1450,12 +1538,12 @@ async function deriveCloudKey(pin,saltB64){
     ['encrypt','decrypt']
   );
 }
-async function encryptProfile(pin){
+async function encryptProfile(pin,db=DB){
   const salt=crypto.getRandomValues(new Uint8Array(16));
   const iv=crypto.getRandomValues(new Uint8Array(12));
   const saltB64=bytesToB64(salt);
   const key=await deriveCloudKey(pin,saltB64);
-  const plain={version:2,profileId:ACTIVE_PROFILE,savedAt:new Date().toISOString(),db:DB};
+  const plain={version:2,profileId:ACTIVE_PROFILE,savedAt:new Date().toISOString(),db};
   const cipher=await crypto.subtle.encrypt(
     {name:'AES-GCM',iv,additionalData:enc.encode(ACTIVE_PROFILE)},
     key,
@@ -1544,6 +1632,52 @@ async function saveCloudProfile(manual=false){
     if(CLOUD.pending){ CLOUD.pending=false; queueCloudSave(250); }
   }
 }
+async function changeCloudPin(){
+  const oldPin=document.getElementById('oldCloudPin').value.trim();
+  const newPin=document.getElementById('newCloudPin').value.trim();
+  const msg=document.getElementById('pinChangeMsg');
+  msg.textContent='';
+  if(!cloudReady()){ toast("Cloud not configured"); updateCloudUI(); return; }
+  if(!oldPin||!newPin){ toast("Enter old and new PIN"); return; }
+  if(oldPin===newPin){ toast("New PIN must be different"); return; }
+  setCloudState("Changing PIN...");
+  msg.textContent="Verifying old PIN...";
+  try{
+    const rows=await supabaseRequest(`${CLOUD_TABLE}?profile_id=eq.${encodeURIComponent(ACTIVE_PROFILE)}&select=data,updated_at`);
+    if(!rows.length||!rows[0].data||!rows[0].data.cipher){
+      toast("No cloud profile found");
+      msg.textContent="Save this profile to cloud before changing its PIN.";
+      updateCloudUI();
+      return;
+    }
+    const cloudDb=await decryptProfile(rows[0].data,oldPin);
+    const dbForNewPin=(CLOUD.unlocked&&CLOUD.pin===oldPin)?DB:cloudDb;
+    msg.textContent="Saving with new PIN...";
+    const data=await encryptProfile(newPin,dbForNewPin);
+    await supabaseRequest(`${CLOUD_TABLE}?on_conflict=profile_id`,{
+      method:'POST',
+      headers:{Prefer:'resolution=merge-duplicates'},
+      body:JSON.stringify([{profile_id:ACTIVE_PROFILE,data}])
+    });
+    CLOUD.pin=newPin; CLOUD.unlocked=true; CLOUD.lastSaved=new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
+    if(dbForNewPin!==DB){
+      DB=dbForNewPin;
+      normalizeDB();
+      save();
+      refreshAll();
+    }
+    document.getElementById('cloudPin').value=newPin;
+    document.getElementById('oldCloudPin').value='';
+    document.getElementById('newCloudPin').value='';
+    msg.textContent="PIN changed. Future loads need the new PIN.";
+    toast("PIN changed");
+  }catch(err){
+    CLOUD.unlocked=false;
+    msg.textContent=err.name==='OperationError'?"Old PIN did not unlock this profile.":"PIN change failed.";
+    toast(err.name==='OperationError'?"Wrong old PIN":"PIN change failed");
+  }
+  updateCloudUI();
+}
 function queueCloudSave(delay=900){
   if(!CLOUD.unlocked||!cloudReady()) return;
   clearTimeout(CLOUD.timer);
@@ -1597,6 +1731,7 @@ async function openProfileFromGate(useCloud=true){
 }
 document.getElementById('cloudLoadBtn').onclick=()=>{ if(switchProfile(document.getElementById('profileInput').value)) loadCloudProfile(); };
 document.getElementById('cloudSaveBtn').onclick=()=>{ if(switchProfile(document.getElementById('profileInput').value)) saveCloudProfile(true); };
+document.getElementById('changePinBtn').onclick=()=>{ if(switchProfile(document.getElementById('profileInput').value)) changeCloudPin(); };
 document.getElementById('gateOpenBtn').onclick=()=>openProfileFromGate(true);
 document.getElementById('gateLocalBtn').onclick=()=>openProfileFromGate(false);
 ['gateProfile','gatePin'].forEach(id=>document.getElementById(id).addEventListener('keydown',e=>{ if(e.key==='Enter') openProfileFromGate(true); }));
