@@ -2,3 +2,9 @@
 *.xlsx
 server.out
 server.err
+node_modules/
+playwright-report/
+playwright-results/
+test-results/
+.claude/
+.zip

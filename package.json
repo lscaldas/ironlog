@@ -1,0 +1,27 @@
+{
+  "name": "workout",
+  "version": "1.0.0",
+  "description": "IronLog is a static, single-page workout tracker. It can be hosted on GitHub Pages, Netlify, or Cloudflare Pages with no build step.",
+  "main": "cloud-config.js",
+  "scripts": {
+    "start:smoke": "node tests/smoke/static-server.cjs",
+    "test:smoke": "playwright test tests/smoke",
+    "test:full": "playwright test",
+    "test": "npm run test:full"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/lscaldas/ironlog.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/lscaldas/ironlog/issues"
+  },
+  "homepage": "https://github.com/lscaldas/ironlog#readme",
+  "devDependencies": {
+    "@playwright/test": "^1.61.0"
+  }
+}
