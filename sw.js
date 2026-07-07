@@ -1,8 +1,18 @@
-const CACHE_NAME = 'ironlog-static-v19';
+const CACHE_NAME = 'ironlog-static-v20';
 const APP_SHELL = [
   './',
   './index.html',
+  './styles.css',
   './cloud-config.js',
+  './js/storage.js',
+  './js/catalog-data.js',
+  './js/helpers.js',
+  './js/week.js',
+  './js/exercises.js',
+  './js/stats.js',
+  './js/data.js',
+  './js/cloud.js',
+  './js/init.js',
   './manifest.webmanifest',
   './icons/icon.svg'
 ];
@@ -25,6 +35,9 @@ self.addEventListener('activate', event => {
 
 self.addEventListener('fetch', event => {
   if (event.request.method !== 'GET') return;
+  // Never cache cross-origin requests (e.g. Supabase API responses) —
+  // serving a stale encrypted profile offline would corrupt sync state.
+  if (new URL(event.request.url).origin !== self.location.origin) return;
 
   if (event.request.mode === 'navigate') {
     event.respondWith(
