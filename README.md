@@ -2,6 +2,8 @@
 
 IronLog is a static, single-page workout tracker. It can be hosted on GitHub Pages, Netlify, or Cloudflare Pages with no build step.
 
+Product plans (accounts, billing, sync rework, build tooling) are tracked in [docs/ROADMAP.md](docs/ROADMAP.md).
+
 ## Data model
 
 Workout data is private to each browser/device and is stored in `localStorage` under `ironlog.v2`.
@@ -16,6 +18,8 @@ Workout data is private to each browser/device and is stored in `localStorage` u
 Public app files:
 
 - `index.html`
+- `styles.css`
+- `js/` (app scripts, loaded in order — plain scripts sharing global scope, no build step)
 - `cloud-config.js`
 - `manifest.webmanifest`
 - `sw.js`
