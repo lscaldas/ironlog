@@ -1,18 +1,18 @@
-const CACHE_NAME = 'ironlog-static-v23';
+const CACHE_NAME = 'ironlog-static-v24';
 const APP_SHELL = [
   './',
   './index.html',
-  './styles.css',
-  './cloud-config.js',
-  './js/storage.js',
-  './js/catalog-data.js',
-  './js/helpers.js',
-  './js/week.js',
-  './js/exercises.js',
-  './js/stats.js',
-  './js/data.js',
-  './js/cloud.js',
-  './js/init.js',
+  './styles.css?v=24',
+  './cloud-config.js?v=24',
+  './js/storage.js?v=24',
+  './js/catalog-data.js?v=24',
+  './js/helpers.js?v=24',
+  './js/week.js?v=24',
+  './js/exercises.js?v=24',
+  './js/stats.js?v=24',
+  './js/data.js?v=24',
+  './js/cloud.js?v=24',
+  './js/init.js?v=24',
   './manifest.webmanifest',
   './icons/icon.svg'
 ];
@@ -41,7 +41,7 @@ self.addEventListener('fetch', event => {
 
   if (event.request.mode === 'navigate') {
     event.respondWith(
-      fetch(event.request)
+      fetch(event.request, {cache:'no-store'})
         .then(response => {
           const copy = response.clone();
           caches.open(CACHE_NAME).then(cache => cache.put('./index.html', copy));
@@ -53,7 +53,7 @@ self.addEventListener('fetch', event => {
   }
 
   event.respondWith(
-    fetch(event.request)
+    fetch(event.request, {cache:'no-store'})
       .then(response => {
         const copy = response.clone();
         caches.open(CACHE_NAME).then(cache => cache.put(event.request, copy));
