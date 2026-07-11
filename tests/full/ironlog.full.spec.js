@@ -252,6 +252,18 @@ test('T-020 visible set removal recalculates statistics after reload', async ({ 
   await expect(statValue(page, 'Set volume')).toHaveText('2');
 
   await page.locator('nav').getByRole('button', { name: /Week/i }).click();
+  let removalPrompt = '';
+  page.once('dialog', async (dialog) => {
+    removalPrompt = dialog.message();
+    await dialog.dismiss();
+  });
+  await loggedSetChips(page).first().locator('.x').click();
+  await expect.poll(() => removalPrompt, {
+    message: 'Direct set removal should explain the permanent data loss before deleting.',
+  }).toMatch(/remove|delete/i);
+  await expect(loggedSetChips(page)).toHaveCount(2);
+
+  page.once('dialog', (dialog) => dialog.accept());
   await loggedSetChips(page).first().locator('.x').click();
   await expect(loggedSetChips(page)).toHaveCount(1);
 
@@ -280,6 +292,30 @@ test('MF-07 logged sets expose an edit flow that persists changed values', async
   await expect(loggedSetChips(page).first()).toContainText(/11.*15kg/i);
   await page.reload();
   await expect(loggedSetChips(page).first()).toContainText(/11.*15kg/i);
+});
+
+test('T-010 completed workout sets can be edited from History and persist', async ({ page }, testInfo) => {
+  const name = profileName(testInfo);
+  await openLocalProfile(page, name);
+  await startWorkout(page);
+  await logOneSet(page, '10', '12.5');
+  await finishWorkout(page);
+  await openHistory(page);
+
+  const session = page.getByRole('button', { name: /Completed workout session/i });
+  await session.click();
+  const editSet = page.getByRole('button', { name: /Edit set 10 by 12\.5kg/i });
+  await expect(editSet, 'T-010: completed workout details should expose an edit control for each set.').toBeVisible();
+
+  await editSet.click();
+  await fillSet(page, '11', '15');
+  await page.getByRole('button', { name: /Save set|Update set/i }).click();
+  await expect(page.locator('#histList')).toContainText(/11.*15kg/i);
+
+  await page.reload();
+  await openHistory(page);
+  await page.getByRole('button', { name: /Completed workout session/i }).click();
+  await expect(page.locator('#histList')).toContainText(/11.*15kg/i);
 });
 
 test('exercise editing and deletion are persisted without erasing logged history', async ({ page }, testInfo) => {
