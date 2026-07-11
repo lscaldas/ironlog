@@ -182,7 +182,7 @@ function exCard(e,mk){
   node.querySelector('.log-plus').onclick=()=>openLog(e);
   node.querySelector('.editEx').onclick=()=>openEx(e);
   node.querySelectorAll('.editSet').forEach(btn=>btn.onclick=()=>{ const s=DB.sets.find(x=>x.id===btn.dataset.sid); if(s) openSetEdit(s); });
-  node.querySelectorAll('.x').forEach(x=>x.onclick=()=>{ DB.sets=DB.sets.filter(s=>s.id!==x.dataset.sid); save(); renderWeek(); toast("Set removed"); });
+  node.querySelectorAll('.x').forEach(x=>x.onclick=()=>removeLoggedSet(x.dataset.sid));
   return node;
 }
 
@@ -278,7 +278,7 @@ function doUpdateSet(){
   save();
   return true;
 }
-document.getElementById('saveSetBtn').onclick=()=>{ if(editSetId){ if(doUpdateSet()){ closeSheets(); renderWeek(); toast("Set updated"); } else setLogButtonsBusy(false); return; } if(doLog()){ closeSheets(); renderWeek(); const r=Math.max(0,logEx.target-setsFor(logEx.id,thisWeek()).length); toast(r?`Logged ✓ — ${r} left`:`${logEx.name} complete! ✓`); } else setLogButtonsBusy(false); };
+document.getElementById('saveSetBtn').onclick=()=>{ if(editSetId){ if(doUpdateSet()){ closeSheets(); refreshAll(); toast("Set updated"); } else setLogButtonsBusy(false); return; } if(doLog()){ closeSheets(); renderWeek(); const r=Math.max(0,logEx.target-setsFor(logEx.id,thisWeek()).length); toast(r?`Logged ✓ — ${r} left`:`${logEx.name} complete! ✓`); } else setLogButtonsBusy(false); };
 document.getElementById('saveSetMoreBtn').onclick=()=>{ if(doLog()){ const e=logEx; renderWeek(); openLog(e); toast("Logged ✓"); } else setLogButtonsBusy(false); };
 
 /* ================= Finish workout ================= */

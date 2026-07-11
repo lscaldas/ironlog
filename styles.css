@@ -165,6 +165,9 @@
   .day-ex{font-size:13px;padding:6px 0;border-bottom:1px dashed var(--line);}
   .day-ex:last-child{border:none;}
   .day-ex .nm{font-weight:600;} .day-ex .st{color:var(--muted);font-variant-numeric:tabular-nums;margin-top:3px;}
+  .history-set{display:inline-flex;align-items:center;gap:4px;}
+  .history-set button{border:0;background:transparent;color:var(--accent2);font:inherit;font-size:11px;padding:2px 4px;border-radius:5px;cursor:pointer;}
+  .history-set button:hover,.history-set button:focus-visible{background:rgba(255,255,255,.08);color:var(--txt);}
   .chev{color:var(--dim);transition:transform .2s;} .day.open .chev{transform:rotate(90deg);}
 
   /* Stats */

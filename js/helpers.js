@@ -104,6 +104,22 @@ function deleteCompletedWorkout(id){
   refreshAll();
   toast("Workout deleted");
 }
+function removeLoggedSet(id){
+  const set=DB.sets.find(s=>s.id===id);
+  if(!set){ toast("Set not found"); return false; }
+  if(!confirm(`Remove logged set ${fmtSet(set)}? This cannot be undone.`)) return false;
+  DB.sets=DB.sets.filter(s=>s.id!==id);
+  if(DB.activeWorkout&&Array.isArray(DB.activeWorkout.setIds)){
+    DB.activeWorkout.setIds=DB.activeWorkout.setIds.filter(setId=>setId!==id);
+  }
+  DB.workouts.forEach(workout=>{
+    if(Array.isArray(workout.setIds)) workout.setIds=workout.setIds.filter(setId=>setId!==id);
+  });
+  save();
+  refreshAll();
+  toast("Set removed");
+  return true;
+}
 function renderWorkoutPanel(){
   const panel=document.getElementById('workoutPanel');
   const w=currentActiveWorkout();

@@ -247,7 +247,7 @@ function renderHistory(){
     const rows=Object.keys(byEx).map(id=>{
       const ss=byEx[id].sort((a,b)=>a.ts-b.ts);
       return `<div class="day-ex"><div class="nm">${esc(nameOf(id))} <span style="color:var(--dim);font-weight:400">·${ss.length} set${ss.length>1?'s':''}</span></div>
-        <div class="st">${ss.map(s=>s.reps+'×'+fmtW(s.kg)).join('  ·  ')}</div></div>`;
+        <div class="st">${ss.map(s=>`<span class="history-set"><span>${s.reps}×${fmtW(s.kg)}</span><button class="historyEditSet" type="button" data-sid="${esc(s.id)}" aria-label="Edit set ${s.reps} by ${fmtW(s.kg)}">Edit</button></span>`).join('<span aria-hidden="true"> · </span>')}</div></div>`;
     }).join('');
     const label=`Completed workout session ${relDay(w.date||dateKey(new Date(w.startedAt)))} duration ${workoutDuration(w.startedAt,w.endedAt||w.startedAt)} ${sets.length} set${sets.length===1?'':'s'}`;
     return `<div class="day session" data-wid="${esc(w.id)}">
@@ -283,6 +283,13 @@ function renderHistory(){
     btn.onclick=e=>{
       e.stopPropagation();
       deleteCompletedWorkout(btn.closest('.session').dataset.wid);
+    };
+  });
+  document.querySelectorAll('#histList .historyEditSet').forEach(btn=>{
+    btn.onclick=e=>{
+      e.stopPropagation();
+      const set=DB.sets.find(s=>s.id===btn.dataset.sid);
+      if(set) openSetEdit(set); else toast("Set not found");
     };
   });
 }
