@@ -162,7 +162,7 @@ function renderNextQuests(mk){
     const target=weeklyTargetForExercise(ex,mk);
     const done=Math.min(setsFor(ex.id,mk).length,target);
     return {ex,target,done,left:Math.max(0,target-done)};
-  }).filter(item=>item.target>0&&item.left>0).sort((a,b)=>a.done/a.target-b.done/b.target||b.left-a.left).slice(0,3);
+  }).filter(item=>item.target>0&&item.left>0).sort((a,b)=>a.done/a.target-b.done/b.target||b.left-a.left).slice(0,2);
   document.getElementById('nextQuestSub').textContent=candidates.length?`${candidates.length} suggested moves`:'';
   const list=document.getElementById('nextQuestList');
   list.innerHTML=candidates.length?candidates.map(item=>{
@@ -187,7 +187,7 @@ function renderWeek(){
   document.getElementById('ringPct').textContent=pct+"%";
   document.getElementById('ringTxt').textContent=doneT+"/"+tgtT+" sets";
   document.getElementById('weekHead').textContent =
-    !tgtT?"Free training week": pct>=100?"Quest complete 🔥": doneT===0?"Choose your path. Start anywhere.":(tgtT-doneT)+" quest sets remaining";
+    !tgtT?"Free training week": pct>=100?"Quest complete 🔥": doneT===0?"Start anywhere.":(tgtT-doneT)+" quest sets remaining";
   const tierLabels={maintain:'Maintain',build:'Build',beast:'Beast'};
   const tierNotes={maintain:'Light recovery-friendly volume',build:'Balanced progression',beast:'High-volume challenge'};
   document.getElementById('tierSummary').textContent=`${tierLabels[TRAINING_TIER]} · ${tierNotes[TRAINING_TIER]} · ${tgtT} quest sets`;

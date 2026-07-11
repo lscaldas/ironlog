@@ -1,4 +1,4 @@
-const CACHE_NAME = 'ironlog-static-v22';
+const CACHE_NAME = 'ironlog-static-v23';
 const APP_SHELL = [
   './',
   './index.html',
