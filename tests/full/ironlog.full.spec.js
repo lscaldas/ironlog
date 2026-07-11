@@ -482,6 +482,32 @@ test('completed history sessions toggle details from the keyboard', async ({ pag
   await expect(session).toHaveAttribute('aria-expanded', 'false');
 });
 
+test('mobile weekly quest keeps setup compact and filters on one row', async ({ page }, testInfo) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const name = profileName(testInfo);
+  await openLocalProfile(page, name);
+
+  const layout = await page.evaluate(() => {
+    const height = (selector) => Math.round(document.querySelector(selector).getBoundingClientRect().height);
+    const groupTops = [...document.querySelectorAll('#groupSeg button')]
+      .map((button) => Math.round(button.getBoundingClientRect().top));
+    return {
+      viewportWidth: document.documentElement.clientWidth,
+      scrollWidth: document.documentElement.scrollWidth,
+      heroHeight: height('.quest-hero'),
+      loadoutHeight: height('#questLoadout'),
+      nextQuestHeight: height('.next-quest-card'),
+      groupRows: new Set(groupTops).size,
+    };
+  });
+
+  expect(layout.scrollWidth, 'Mobile dashboard must not overflow horizontally.').toBeLessThanOrEqual(layout.viewportWidth);
+  expect(layout.heroHeight, 'Weekly hero should not dominate the phone viewport.').toBeLessThanOrEqual(205);
+  expect(layout.loadoutHeight, 'The four weekly roles should fit in a compact 2x2 loadout.').toBeLessThanOrEqual(250);
+  expect(layout.nextQuestHeight, 'Recommendations should remain a short actionable list.').toBeLessThanOrEqual(195);
+  expect(layout.groupRows, 'Mobile grouping controls should stay on one row.').toBe(1);
+});
+
 test('mobile logging sheet keeps primary action visible and unobscured by toast', async ({ page }, testInfo) => {
   await page.setViewportSize({ width: 390, height: 844 });
   const name = profileName(testInfo);
