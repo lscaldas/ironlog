@@ -504,7 +504,7 @@ test('mobile weekly quest keeps setup compact and filters on one row', async ({ 
   expect(layout.scrollWidth, 'Mobile dashboard must not overflow horizontally.').toBeLessThanOrEqual(layout.viewportWidth);
   expect(layout.heroHeight, 'Weekly hero should not dominate the phone viewport.').toBeLessThanOrEqual(205);
   expect(layout.loadoutHeight, 'The four weekly roles should fit in a compact 2x2 loadout.').toBeLessThanOrEqual(250);
-  expect(layout.nextQuestHeight, 'Recommendations should remain a short actionable list.').toBeLessThanOrEqual(195);
+  expect(layout.nextQuestHeight, 'Recommendations should remain a short actionable list.').toBeLessThanOrEqual(125);
   expect(layout.groupRows, 'Mobile grouping controls should stay on one row.').toBe(1);
 });
 
