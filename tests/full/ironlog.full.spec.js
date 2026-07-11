@@ -286,7 +286,7 @@ test('muscle bars stack tier lives, stay central, and exercises show per-set con
 
   await expect(page.locator('.quest-hero'), 'The redundant mission summary should not compete with the muscle bars.').toHaveCount(0);
   await expect(page.locator('#mbalCard'), 'Muscle bars are the central decision surface.').toBeVisible();
-  await expect(page.locator('#mbalCard .tier-legend')).toHaveText(/Maintain.*Build.*Beast/);
+  await expect(page.locator('#mbalCard .tier-legend span')).toHaveText(['Maintain', 'Build', 'Beast']);
   const tierColors = await page.evaluate(() => {
     const root = getComputedStyle(document.documentElement);
     return ['--tier-maintain', '--tier-build', '--tier-beast'].map((name) => root.getPropertyValue(name).trim());

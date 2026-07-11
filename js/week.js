@@ -55,7 +55,7 @@ document.querySelectorAll('#groupSeg .gchip').forEach(b=>b.onclick=()=>{
 });
 
 /* ===== Central muscle bars — one stacked bar per muscle, three tier "lives" ===== */
-const TIER_COLORS=['var(--good)','var(--accent)','var(--beast)'];
+const TIER_COLORS=['var(--tier-maintain)','var(--tier-build)','var(--tier-beast)'];
 function renderMuscleBars(mk){
   const rows=muscleEffective(mk);
   const order=MUSCLES.concat(['Other']);
@@ -63,8 +63,6 @@ function renderMuscleBars(mk){
     const ia=order.indexOf(a.muscle), ib=order.indexOf(b.muscle);
     return (ia<0?99:ia)-(ib<0?99:ib)||a.muscle.localeCompare(b.muscle);
   });
-  const prog=weeklyMaintainProgress(mk);
-  document.getElementById('mbalSub').textContent=prog.target?`${prog.done}/${prog.target} muscles maintained`:'';
   document.getElementById('mbalList').innerHTML=data.length?data.map(r=>{
     const st=muscleBarState(r.eff,r.muscle);
     const baseColor=st.cleared>0?TIER_COLORS[Math.min(st.cleared,TIER_COLORS.length)-1]:'';
@@ -138,20 +136,7 @@ function visibleExercises(mk){
 
 function renderWeek(){
   const mk=thisWeek();
-  document.getElementById('weekLabel').textContent="Week of "+weekLabel(mk);
   document.getElementById('weekEmpty').style.display=DB.exercises.length?'none':'block';
-  const {done,target}=weeklyMaintainProgress(mk);
-  const pct=target?Math.round(done/target*100):0;
-  const ring=document.getElementById('ring');
-  const col=pct>=100?'var(--good)':'var(--accent)';
-  ring.style.background=`conic-gradient(${col} ${pct*3.6}deg, var(--line) 0deg)`;
-  document.getElementById('ringPct').textContent=pct+"%";
-  document.getElementById('ringTxt').textContent=done+"/"+target+" muscles";
-  document.getElementById('weekHead').textContent =
-    !target?"Add exercises to start"
-    : done>=target?"Every muscle maintained 🔥 keep stacking"
-    : done===0?"Fill the bars — maintain every muscle"
-    : `${target-done} muscle${target-done===1?'':'s'} below maintenance`;
   renderGroupChips();
   renderWeekSetup(mk);
   renderMuscleBars(mk);

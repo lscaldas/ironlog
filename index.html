@@ -12,7 +12,7 @@
 <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="icons/icon.svg">
 <title>IronLog — Weekly Sets</title>
-<link rel="stylesheet" href="styles.css?v=25">
+<link rel="stylesheet" href="styles.css?v=26">
 </head>
 <body>
 <div class="gate" id="profileGate">
@@ -38,17 +38,6 @@
 
   <!-- ===== WEEK ===== -->
   <section class="view active" id="v-week">
-    <div class="hero quest-hero">
-      <div class="quest-kicker"><span>Current mission</span><div class="wk" id="weekLabel">This week</div></div>
-      <div class="quest-main">
-        <div class="ring" id="ring"><div class="inner"><div><b id="ringPct">0%</b><br><span id="ringTxt">0/0 muscles</span></div></div></div>
-        <div class="hero-info">
-          <h2>This week</h2>
-          <div class="big" id="weekHead">Fill the bars</div>
-        </div>
-      </div>
-    </div>
-
     <div class="workout-panel" id="workoutPanel"></div>
 
     <div class="card loadout-card" id="weekSetup" hidden>
@@ -62,7 +51,14 @@
     <div class="week-focus-row" id="weekFocusRow" hidden></div>
 
     <div class="card mbalCard" id="mbalCard">
-      <div class="card-h"><div><div class="eyebrow">Decide by the bars</div><h2>Muscle bars</h2></div><div class="sub" id="mbalSub"></div></div>
+      <div class="card-h muscle-bars-head">
+        <div><div class="eyebrow">Decide by the bars</div><h2>Muscle bars</h2></div>
+        <div class="tier-legend" aria-label="Muscle bar tiers">
+          <span class="maintain"><i></i>Maintain</span>
+          <span class="build"><i></i>Build</span>
+          <span class="beast"><i></i>Beast</span>
+        </div>
+      </div>
       <div class="mbal" id="mbalList"></div>
     </div>
 
@@ -237,15 +233,15 @@
 
 <div class="toast" id="toast"></div>
 
-<script src="cloud-config.js?v=25"></script>
-<script src="js/storage.js?v=25"></script>
-<script src="js/catalog-data.js?v=25"></script>
-<script src="js/helpers.js?v=25"></script>
-<script src="js/week.js?v=25"></script>
-<script src="js/exercises.js?v=25"></script>
-<script src="js/stats.js?v=25"></script>
-<script src="js/data.js?v=25"></script>
-<script src="js/cloud.js?v=25"></script>
-<script src="js/init.js?v=25"></script>
+<script src="cloud-config.js?v=26"></script>
+<script src="js/storage.js?v=26"></script>
+<script src="js/catalog-data.js?v=26"></script>
+<script src="js/helpers.js?v=26"></script>
+<script src="js/week.js?v=26"></script>
+<script src="js/exercises.js?v=26"></script>
+<script src="js/stats.js?v=26"></script>
+<script src="js/data.js?v=26"></script>
+<script src="js/cloud.js?v=26"></script>
+<script src="js/init.js?v=26"></script>
 </body>
 </html>
