@@ -4,16 +4,16 @@ IronLog is a static, single-page workout tracker. It can be hosted on GitHub Pag
 
 Product plans (accounts, billing, sync rework, build tooling) are tracked in [docs/ROADMAP.md](docs/ROADMAP.md).
 
-## Weekly quests
+## Weekly muscle bars
 
-The Week screen separates the permanent exercise program from the current week's goal:
+The Week screen is driven by effective-set progress for each muscle, not per-exercise quotas:
 
-- **Quest** groups count toward weekly completion.
-- **Bonus** groups remain available but never make the week incomplete.
-- **Rest** groups are intentionally outside the week's goal but remain fully loggable.
-- Maintain, Build, and Beast modes scale only the current week's quest targets; they do not rewrite the permanent program.
+- Every logged set adds `1.0` to its primary muscle plus documented fractional contributions to secondary muscles.
+- Each muscle bar fills through three stacked thresholds: **Maintain**, **Build**, and **Beast**.
+- Exercise cards show exactly what one set contributes to the muscle bars.
+- At the start of a week, the user chooses Push, Pull, Legs, and/or Core. Unselected groups leave both the exercise list and the weekly completion goal.
 
-Weekly loadouts are stored by Monday date, survive reload/export/cloud sync, and carry forward as the next week's default. Logging is never restricted by the selected loadout.
+The weekly selection is stored by Monday date, survives reload/export/cloud sync, and carries forward as the next week's default. The picker disappears after confirmation and can be reopened with **Change**.
 
 ## Data model
 

@@ -11,16 +11,9 @@ function normalizeDB(){
   if(!DB.weekPlans || typeof DB.weekPlans!=='object' || Array.isArray(DB.weekPlans)){ DB.weekPlans={}; dirty=true; }
   Object.keys(DB.weekPlans).forEach(mk=>{
     const plan=DB.weekPlans[mk];
-    if(!/^\d{4}-\d{2}-\d{2}$/.test(mk)||!plan||typeof plan!=='object'||Array.isArray(plan)){
-      delete DB.weekPlans[mk]; dirty=true; return;
-    }
-    if(!REC_SETS_TIERS[plan.tier]){ plan.tier='build'; dirty=true; }
-    if(!plan.focus||typeof plan.focus!=='object'||Array.isArray(plan.focus)){ plan.focus={}; dirty=true; }
-    Object.keys(plan.focus).forEach(group=>{
-      if(!WEEK_LOADOUT_GROUPS.some(item=>item.id===group)||!WEEK_FOCUS_STATES.includes(plan.focus[group])){
-        delete plan.focus[group]; dirty=true;
-      }
-    });
+    if(!/^\d{4}-\d{2}-\d{2}$/.test(mk)){ delete DB.weekPlans[mk]; dirty=true; return; }
+    const norm=normalizeWeekPlan(plan);
+    if(JSON.stringify(plan)!==JSON.stringify(norm)){ DB.weekPlans[mk]=norm; dirty=true; }
   });
   if(!DB.activeWorkout || typeof DB.activeWorkout!=='object' || DB.activeWorkout.status!=='active'){
     if(DB.activeWorkout!==null){ dirty=true; }
@@ -130,6 +123,6 @@ if(AUTH_SESSION) hideProfileGate(); else showProfileGate();
 
 if('serviceWorker' in navigator){
   window.addEventListener('load',()=>{
-    navigator.serviceWorker.register('./sw.js?v=24').then(reg=>reg.update()).catch(()=>{});
+    navigator.serviceWorker.register('./sw.js?v=25').then(reg=>reg.update()).catch(()=>{});
   });
 }

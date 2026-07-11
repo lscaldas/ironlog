@@ -12,7 +12,7 @@
 <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="icons/icon.svg">
 <title>IronLog — Weekly Sets</title>
-<link rel="stylesheet" href="styles.css?v=24">
+<link rel="stylesheet" href="styles.css?v=25">
 </head>
 <body>
 <div class="gate" id="profileGate">
@@ -41,33 +41,29 @@
     <div class="hero quest-hero">
       <div class="quest-kicker"><span>Current mission</span><div class="wk" id="weekLabel">This week</div></div>
       <div class="quest-main">
-        <div class="ring" id="ring"><div class="inner"><div><b id="ringPct">0%</b><br><span id="ringTxt">0/0 sets</span></div></div></div>
+        <div class="ring" id="ring"><div class="inner"><div><b id="ringPct">0%</b><br><span id="ringTxt">0/0 muscles</span></div></div></div>
         <div class="hero-info">
-          <h2>Weekly quest</h2>
-          <div class="big" id="weekHead">Let's get those sets in</div>
-          <div class="tier-summary" id="tierSummary"></div>
+          <h2>This week</h2>
+          <div class="big" id="weekHead">Fill the bars</div>
         </div>
-      </div>
-      <div class="hero-tier" id="tierSeg" title="Choose how demanding this week's quest should be">
-        <button class="tchip" data-t="maintain"><span>🍃</span><b>Maintain</b><small>Light</small></button>
-        <button class="tchip" data-t="build"><span>⚔️</span><b>Build</b><small>Balanced</small></button>
-        <button class="tchip" data-t="beast"><span>🔥</span><b>Beast</b><small>High volume</small></button>
       </div>
     </div>
 
     <div class="workout-panel" id="workoutPanel"></div>
 
-    <div class="card loadout-card" id="questLoadout">
+    <div class="card loadout-card" id="weekSetup" hidden>
       <div class="loadout-head">
-        <div><div class="eyebrow">Weekly loadout</div><h2>Choose what counts</h2></div>
-        <div class="sub">Quest affects completion. Bonus and Rest never block the week.</div>
+        <div><div class="eyebrow">Weekly loadout</div><h2>What are you training this week?</h2></div>
+        <div class="sub">Deselected groups hide until next week. Change anytime.</div>
       </div>
-      <div class="loadout-list" id="loadoutList"></div>
+      <div class="setup-groups" id="setupGroups"></div>
+      <button class="btn" id="setupConfirmBtn" style="margin-top:10px;">Lock in this week</button>
     </div>
+    <div class="week-focus-row" id="weekFocusRow" hidden></div>
 
-    <div class="card next-quest-card">
-      <div class="card-h"><div><div class="eyebrow">Recommended, never locked</div><h2>Next quest</h2></div><div class="sub" id="nextQuestSub"></div></div>
-      <div class="next-quest-list" id="nextQuestList"></div>
+    <div class="card mbalCard" id="mbalCard">
+      <div class="card-h"><div><div class="eyebrow">Decide by the bars</div><h2>Muscle bars</h2></div><div class="sub" id="mbalSub"></div></div>
+      <div class="mbal" id="mbalList"></div>
     </div>
 
     <div class="glabel">Group by</div>
@@ -75,20 +71,6 @@
       <button class="gchip on" data-g="muscle">Muscle</button>
       <button class="gchip" data-g="region">Upper / Lower</button>
       <button class="gchip" data-g="ppl">Push / Pull / Legs</button>
-    </div>
-
-  <div class="card mbalCard closed" id="mbalCard">
-      <div class="mbal-h" id="mbalToggle">
-        <div class="card-h mbal-title" style="margin:0;"><h2>Muscle detail</h2><div class="sub" id="mbalSub"></div></div>
-        <div class="mbal-tools">
-          <div class="mini-seg" id="mbalMode">
-            <button type="button" data-m="plan" class="on">Plan</button>
-            <button type="button" data-m="effective">Effective</button>
-          </div>
-        </div>
-        <span class="chev" style="margin-left:8px;">›</span>
-      </div>
-      <div class="mbal" id="mbalList"></div>
     </div>
 
     <div id="weekList"></div>
@@ -116,7 +98,7 @@
     <div class="strip">
       <div class="stat a"><div class="n" id="aVol">0</div><div class="l">Set volume</div></div>
       <div class="stat b"><div class="n" id="aSets">0</div><div class="l">Exercises</div></div>
-      <div class="stat c"><div class="n" id="aHit">0%</div><div class="l">Weekly target</div></div>
+      <div class="stat c"><div class="n" id="aHit">0%</div><div class="l">Maintained</div></div>
     </div>
     <div class="card">
       <div class="card-h"><h2>Sets per week</h2><div class="sub" id="targetLineLbl"></div></div>
@@ -186,7 +168,7 @@
     <h3 id="exTitle">Add exercise</h3>
     <button class="sheet-close" id="cancelExBtn" type="button" title="Cancel">x</button>
   </div>
-  <p class="h3sub">Set a weekly set target. Double progression: hit the top of your rep range, then add weight.</p>
+  <p class="h3sub">Every set feeds the muscle bars — no per-exercise quota. Double progression: hit the top of your rep range, then add weight.</p>
   <input id="fMuscle" type="hidden">
   <input id="fArea" type="hidden">
   <div class="field">
@@ -201,10 +183,7 @@
   <div class="field"><label>Exercise name</label><div class="input-combo"><input id="fName" list="exDL" placeholder="Select or type custom" autocomplete="off"><button class="drop-btn" id="exDropBtn" type="button" title="Show more exercise choices">v</button></div><datalist id="exDL"></datalist></div>
   <div class="ex-suggestions" id="exSuggestList"></div>
   <div class="form-hint" id="matchHint"></div>
-  <div class="row">
-    <div class="field"><label>My group / split</label><input id="fBucket" list="bkDL" placeholder="Upper"><datalist id="bkDL"></datalist></div>
-    <div class="field"><label>Sets / week</label><input id="fTarget" type="number" inputmode="numeric" value="4" min="1"></div>
-  </div>
+  <div class="field"><label>My group / split</label><input id="fBucket" list="bkDL" placeholder="Upper"><datalist id="bkDL"></datalist></div>
   <div class="row">
     <div class="field"><label>+Kg step</label><input id="fInc" type="number" inputmode="decimal" step="0.25" value="2.5"></div>
     <div class="field"><label>Rep range low</label><input id="fLow" type="number" inputmode="numeric" value="8"></div>
@@ -258,15 +237,15 @@
 
 <div class="toast" id="toast"></div>
 
-<script src="cloud-config.js?v=24"></script>
-<script src="js/storage.js?v=24"></script>
-<script src="js/catalog-data.js?v=24"></script>
-<script src="js/helpers.js?v=24"></script>
-<script src="js/week.js?v=24"></script>
-<script src="js/exercises.js?v=24"></script>
-<script src="js/stats.js?v=24"></script>
-<script src="js/data.js?v=24"></script>
-<script src="js/cloud.js?v=24"></script>
-<script src="js/init.js?v=24"></script>
+<script src="cloud-config.js?v=25"></script>
+<script src="js/storage.js?v=25"></script>
+<script src="js/catalog-data.js?v=25"></script>
+<script src="js/helpers.js?v=25"></script>
+<script src="js/week.js?v=25"></script>
+<script src="js/exercises.js?v=25"></script>
+<script src="js/stats.js?v=25"></script>
+<script src="js/data.js?v=25"></script>
+<script src="js/cloud.js?v=25"></script>
+<script src="js/init.js?v=25"></script>
 </body>
 </html>

@@ -3,22 +3,36 @@
 const setsFor=(exId,mk)=>DB.sets.filter(s=>s.exId===exId && mondayOf(s.date)===mk);
 const allSetsFor=exId=>DB.sets.filter(s=>s.exId===exId).sort((a,b)=>a.ts-b.ts);
 const fmtW=kg=>kg>0?kg+"kg":"BW";
-const WEEK_FOCUS_STATES=['quest','bonus','rest'];
 const WEEK_LOADOUT_GROUPS=[
-  {id:'Push',ability:'Strike',icon:'⚡',muscles:'Chest · shoulders · triceps'},
-  {id:'Pull',ability:'Grapple',icon:'⛓',muscles:'Back · biceps · traps'},
-  {id:'Legs',ability:'Kick',icon:'💥',muscles:'Quads · hamstrings · calves'},
-  {id:'Core',ability:'Guard',icon:'◈',muscles:'Core · stability'},
-  {id:'Other',ability:'Wildcard',icon:'✦',muscles:'Other movements'}
+  {id:'Push',icon:'⚡',muscles:'Chest · shoulders · triceps'},
+  {id:'Pull',icon:'⛓',muscles:'Back · biceps · traps'},
+  {id:'Legs',icon:'💥',muscles:'Quads · hamstrings · calves'},
+  {id:'Core',icon:'◈',muscles:'Core · stability'},
+  {id:'Other',icon:'✦',muscles:'Other movements'}
 ];
-const WEEK_TIER_SCALE={maintain:.65,build:1,beast:1.35};
+const ALL_GROUP_IDS=WEEK_LOADOUT_GROUPS.map(g=>g.id);
+/* One "life" per training-week intensity: fill maintain, then build loads on top, then beast. */
+const BAR_TIERS=[
+  {id:'maintain',label:'Maintained',icon:'🍃'},
+  {id:'build',label:'Built',icon:'💪'},
+  {id:'beast',label:'Beast',icon:'🔥'}
+];
+function normalizeWeekPlan(raw){
+  const plan={groups:ALL_GROUP_IDS.slice(),chosen:false};
+  if(!raw||typeof raw!=='object'||Array.isArray(raw)) return plan;
+  let groups=Array.isArray(raw.groups)?raw.groups.filter(g=>ALL_GROUP_IDS.includes(g)):null;
+  if(!groups&&raw.focus&&typeof raw.focus==='object'&&!Array.isArray(raw.focus)){
+    groups=ALL_GROUP_IDS.filter(g=>raw.focus[g]!=='rest');
+  }
+  if(groups&&groups.length) plan.groups=[...new Set(groups)];
+  plan.chosen=raw.chosen===true||(raw.chosen===undefined&&(raw.tier!==undefined||raw.focus!==undefined));
+  return plan;
+}
 function defaultWeekPlan(mk=thisWeek()){
   const previousKey=Object.keys(DB.weekPlans||{}).filter(key=>key<mk).sort().reverse()[0];
   const previous=previousKey&&DB.weekPlans[previousKey];
-  return {
-    tier:previous?.tier||(mk===thisWeek()&&REC_SETS_TIERS[TRAINING_TIER]?TRAINING_TIER:'build'),
-    focus:previous?.focus?Object.assign({},previous.focus):{}
-  };
+  const groups=Array.isArray(previous?.groups)?previous.groups.filter(g=>ALL_GROUP_IDS.includes(g)):[];
+  return {groups:groups.length?groups:ALL_GROUP_IDS.slice(),chosen:false};
 }
 function weekPlanFor(mk=thisWeek(),create=false){
   if(DB.weekPlans&&DB.weekPlans[mk]) return DB.weekPlans[mk];
@@ -29,27 +43,55 @@ function weekPlanFor(mk=thisWeek(),create=false){
   }
   return plan;
 }
-function weekTierFor(mk=thisWeek()){ return weekPlanFor(mk).tier; }
+function weekGroupsFor(mk=thisWeek()){
+  const groups=weekPlanFor(mk).groups;
+  return Array.isArray(groups)&&groups.length?groups:ALL_GROUP_IDS.slice();
+}
+function isGroupActive(group,mk=thisWeek()){ return weekGroupsFor(mk).includes(group); }
 function focusGroupForExercise(ex){
   const group=pplOf(ex);
-  return WEEK_LOADOUT_GROUPS.some(item=>item.id===group)?group:'Other';
+  return ALL_GROUP_IDS.includes(group)?group:'Other';
 }
-function focusStateFor(group,mk=thisWeek()){
-  const state=weekPlanFor(mk).focus?.[group];
-  return WEEK_FOCUS_STATES.includes(state)?state:'quest';
-}
-function weeklyTargetForExercise(ex,mk=thisWeek()){
-  if(focusStateFor(focusGroupForExercise(ex),mk)!=='quest') return 0;
-  return Math.max(1,Math.ceil((ex.target||1)*(WEEK_TIER_SCALE[weekTierFor(mk)]||1)));
-}
-function weeklyQuestProgress(mk=thisWeek()){
-  let done=0,target=0;
-  DB.exercises.forEach(ex=>{
-    const goal=weeklyTargetForExercise(ex,mk);
-    target+=goal;
-    done+=Math.min(setsFor(ex.id,mk).length,goal);
+/* What one set of this exercise adds to the muscle bars: primary 1.0 + weighted secondaries. */
+function exerciseContributions(ex){
+  const primary=muscleOf(ex)||'Other';
+  const parts=[{muscle:primary,weight:1,primary:true}];
+  Object.entries(secondaryMuscles(ex)).sort((a,b)=>b[1]-a[1]).forEach(([muscle,weight])=>{
+    if(muscle&&muscle!==primary&&weight>0) parts.push({muscle,weight,primary:false});
   });
-  return {done,target};
+  return parts;
+}
+function muscleThresholds(muscle){
+  return BAR_TIERS.map(t=>{ const tier=REC_SETS_TIERS[t.id]; return tier[muscle]||tier.Other; });
+}
+function muscleEffective(mk=thisWeek()){
+  const rows={};
+  const ensure=m=>rows[m]||(rows[m]={muscle:m,eff:0,direct:0,inProgram:false});
+  DB.exercises.forEach(ex=>{
+    ensure(muscleOf(ex)||'Other').inProgram=true;
+    const n=setsFor(ex.id,mk).length;
+    if(!n) return;
+    exerciseContributions(ex).forEach(p=>{
+      const row=ensure(p.muscle);
+      row.eff+=n*p.weight;
+      if(p.primary) row.direct+=n;
+    });
+  });
+  return rows;
+}
+function muscleBarState(eff,muscle){
+  const thresholds=muscleThresholds(muscle);
+  let cleared=0;
+  while(cleared<thresholds.length&&eff>=thresholds[cleared]-1e-9) cleared++;
+  const prev=cleared>0?thresholds[cleared-1]:0;
+  const next=cleared<thresholds.length?thresholds[cleared]:null;
+  const pct=next===null?100:Math.max(0,Math.min(100,(eff-prev)/(next-prev)*100));
+  return {thresholds,cleared,prev,next,pct};
+}
+function weeklyMaintainProgress(mk=thisWeek()){
+  const list=Object.values(muscleEffective(mk)).filter(r=>r.inProgram&&isGroupActive(MUSCLE_PPL[r.muscle]||'Other',mk));
+  const done=list.filter(r=>r.eff>=muscleThresholds(r.muscle)[0]-1e-9).length;
+  return {done,target:list.length};
 }
 function setScore(s){ return s ? ((s.kg||0)>0 ? (s.kg*1000+s.reps) : s.reps) : 0; }
 function betterSet(a,b){

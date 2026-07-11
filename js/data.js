@@ -43,14 +43,11 @@ function validateImportedDB(raw){
     sets: [],
     workouts: (raw.workouts||[]).map(w=>isPlainObject(w)?Object.assign({}, w, {setIds:Array.isArray(w.setIds)?w.setIds.slice():w.setIds}):w),
     activeWorkout: isPlainObject(raw.activeWorkout) ? Object.assign({}, raw.activeWorkout, {setIds:Array.isArray(raw.activeWorkout.setIds)?raw.activeWorkout.setIds.slice():raw.activeWorkout.setIds}) : null,
-    weekPlans: isPlainObject(raw.weekPlans) ? Object.fromEntries(Object.entries(raw.weekPlans).map(([mk,plan])=>[mk,isPlainObject(plan)?Object.assign({},plan,{focus:isPlainObject(plan.focus)?Object.assign({},plan.focus):plan.focus}):plan])) : {}
+    weekPlans: isPlainObject(raw.weekPlans) ? Object.fromEntries(Object.entries(raw.weekPlans).map(([mk,plan])=>[mk,normalizeWeekPlan(plan)])) : {}
   });
 
-  for(const [mk,plan] of Object.entries(next.weekPlans)){
-    if(!isValidDateKeyValue(mk)||!isPlainObject(plan)||!REC_SETS_TIERS[plan.tier]||!isPlainObject(plan.focus)) return {ok:false,message:"Invalid file"};
-    for(const [group,state] of Object.entries(plan.focus)){
-      if(!WEEK_LOADOUT_GROUPS.some(item=>item.id===group)||!WEEK_FOCUS_STATES.includes(state)) return {ok:false,message:"Invalid file"};
-    }
+  for(const mk of Object.keys(next.weekPlans)){
+    if(!isValidDateKeyValue(mk)) return {ok:false,message:"Invalid file"};
   }
 
   const exerciseIds=new Set();

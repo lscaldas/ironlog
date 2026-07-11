@@ -10,7 +10,6 @@ function openEx(e){
   document.getElementById('fMuscle').value=e?muscleOf(e):'';
   document.getElementById('fArea').value=e?areaOf(e):'';
   document.getElementById('fBucket').value=e?e.bucket:(DB.exercises[0]?.bucket||'Upper');
-  document.getElementById('fTarget').value=e?e.target:4;
   document.getElementById('fLow').value=e?e.low:8;
   document.getElementById('fHigh').value=e?e.high:12;
   document.getElementById('fInc').value=e?e.inc:2.5;
@@ -153,7 +152,6 @@ document.getElementById('saveExBtn').onclick=()=>{
   const obj={ name, muscle:(document.getElementById('fMuscle').value.trim()||guessMuscle(name)||'Other'),
     area:(document.getElementById('fArea').value.trim()||guessArea(name)||'Other'),
     bucket:(document.getElementById('fBucket').value.trim()||'Other'),
-    target:Math.max(1,parseInt(document.getElementById('fTarget').value)||4),
     low:parseInt(document.getElementById('fLow').value)||8, high:parseInt(document.getElementById('fHigh').value)||12,
     inc:parseFloat(document.getElementById('fInc').value)||2.5, notes:document.getElementById('fNotes').value.trim() };
   if(editEx){ Object.assign(editEx,obj); } else { obj.id=uid('e'); DB.exercises.push(obj); }
@@ -167,14 +165,7 @@ document.getElementById('delExBtn').onclick=()=>{
 };
 
 /* ================= CATALOG ================= */
-function contribListFor(ex){
-  const primary=muscleOf(ex)||'Other';
-  const parts=[{muscle:primary,weight:1,primary:true}];
-  Object.entries(secondaryMuscles(ex)).sort((a,b)=>b[1]-a[1]).forEach(([muscle,weight])=>{
-    if(muscle&&muscle!==primary&&weight>0) parts.push({muscle,weight,primary:false});
-  });
-  return parts;
-}
+function contribListFor(ex){ return exerciseContributions(ex); }
 function contribHtml(ex){
   return contribListFor(ex).map(p=>`<span class="cat-contrib ${p.primary?'primary':''}">${esc(p.muscle)} <b>${fmtEff(p.weight)}</b></span>`).join('');
 }

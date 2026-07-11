@@ -210,14 +210,6 @@ const REC_SETS_TIERS={
   beast:{ Chest:14, Back:14, Shoulders:12, Traps:8, Biceps:12, Triceps:12,
     Forearms:8, Quads:14, Hamstrings:12, Glutes:12, Calves:10, Core:8, Other:12 }
 };
-const TIER_META={
-  maintain:{label:'Maintaining', icon:'🍃'},
-  build:{label:'Building', icon:'💪'},
-  beast:{label:'Beast mode', icon:'🔥'}
-};
-let TRAINING_TIER=localStorage.getItem('ironlog.tier');
-if(!REC_SETS_TIERS[TRAINING_TIER]) TRAINING_TIER='build';
-function recMin(muscle){ const t=REC_SETS_TIERS[TRAINING_TIER]||REC_SETS_TIERS.build; return t[muscle]||t.Other; }
 function secondaryMuscles(ex){
   if(ex.secondary&&Object.keys(ex.secondary).length) return {...ex.secondary};
   if(ex.match?.secondary&&Object.keys(ex.match.secondary).length) return {...ex.match.secondary};
