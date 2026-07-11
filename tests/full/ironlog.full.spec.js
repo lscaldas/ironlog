@@ -237,6 +237,48 @@ test('T-015 invalid weights are rejected without creating sets', async ({ page }
   await expect(loggedSetChips(page)).toHaveCount(0);
 });
 
+test('weekly loadout excludes rested groups without locking their exercises', async ({ page }, testInfo) => {
+  const name = profileName(testInfo);
+  await openLocalProfile(page, name);
+
+  await expect(page.getByRole('heading', { name: /^Weekly quest$/i })).toBeVisible();
+  await expect(page.getByRole('heading', { name: /^Next quest$/i })).toBeVisible();
+  await expect(page.locator('#ringTxt')).toHaveText('0/50 sets');
+
+  const legsRole = page.getByLabel('Legs weekly role', { exact: true });
+  await legsRole.selectOption('rest');
+  await expect(page.locator('#ringTxt')).toHaveText('0/40 sets');
+
+  await startWorkout(page);
+  const cableSquats = page.locator('#weekList .ex', { hasText: 'Cable Squats' });
+  await expect(cableSquats).toBeVisible();
+  await cableSquats.locator('button[title="Log set"]').click();
+  await fillSet(page, '8', '20');
+  await page.getByRole('button', { name: /Log this set/i }).click();
+
+  await expect(cableSquats.locator('.wkchip')).toHaveCount(1);
+  await expect(page.locator('#ringTxt'), 'Rest-group sets should not inflate or reduce the chosen quest.').toHaveText('0/40 sets');
+
+  await page.reload();
+  await expect(page.getByLabel('Legs weekly role', { exact: true })).toHaveValue('rest');
+  await expect(cableSquats.locator('.wkchip')).toHaveCount(1);
+  await expect(page.locator('#ringTxt')).toHaveText('0/40 sets');
+});
+
+test('training mode visibly changes and persists the weekly quest target', async ({ page }, testInfo) => {
+  const name = profileName(testInfo);
+  await openLocalProfile(page, name);
+  await expect(page.locator('#ringTxt')).toHaveText('0/50 sets');
+
+  await page.locator('#tierSeg button[data-t="maintain"]').click();
+  await expect(page.locator('#ringTxt')).toHaveText('0/38 sets');
+  await expect(page.locator('#tierSummary')).toContainText(/Maintain.*38 quest sets/i);
+
+  await page.reload();
+  await expect(page.locator('#ringTxt')).toHaveText('0/38 sets');
+  await expect(page.locator('#tierSeg button[data-t="maintain"]')).toHaveClass(/on/);
+});
+
 test('T-020 visible set removal recalculates statistics after reload', async ({ page }, testInfo) => {
   const name = profileName(testInfo);
   await openLocalProfile(page, name);
