@@ -287,7 +287,7 @@ document.getElementById('profileGate').addEventListener('keydown',e=>{
 });
 
 function seed(withHistory){
-  DB={schemaVersion:3,initialized:true,exercises:SEED.map(s=>({id:uid('e'),...s})), sets:[],workouts:[],activeWorkout:null};
+  DB={schemaVersion:4,initialized:true,exercises:SEED.map(s=>({id:uid('e'),...s})), sets:[],workouts:[],activeWorkout:null,weekPlans:{}};
   if(withHistory){
     // 7 weeks of progressing data
     const baseKg={"Cable Rows":30,"Overhead Press":30,"Single-arm Face Pulls":15,"Cable Squats":40,"Single Cable Leg Curl":30,"Cable Single-leg Calf Raise":35,"Ring Dips":0,"Triceps Pulldown":22.5,"Triceps Overhead Ext.":20,"Cable Lateral Raise - Lower Path":10,"Cable Lateral Raise - Upper Path":7.5,"Bayesian Single-arm Curl":12.5,"Single-arm Cable Shrugs":25,Pullups:0,Pushups:0};

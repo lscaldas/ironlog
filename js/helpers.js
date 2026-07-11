@@ -3,6 +3,54 @@
 const setsFor=(exId,mk)=>DB.sets.filter(s=>s.exId===exId && mondayOf(s.date)===mk);
 const allSetsFor=exId=>DB.sets.filter(s=>s.exId===exId).sort((a,b)=>a.ts-b.ts);
 const fmtW=kg=>kg>0?kg+"kg":"BW";
+const WEEK_FOCUS_STATES=['quest','bonus','rest'];
+const WEEK_LOADOUT_GROUPS=[
+  {id:'Push',ability:'Strike',icon:'⚡',muscles:'Chest · shoulders · triceps'},
+  {id:'Pull',ability:'Grapple',icon:'⛓',muscles:'Back · biceps · traps'},
+  {id:'Legs',ability:'Kick',icon:'💥',muscles:'Quads · hamstrings · calves'},
+  {id:'Core',ability:'Guard',icon:'◈',muscles:'Core · stability'},
+  {id:'Other',ability:'Wildcard',icon:'✦',muscles:'Other movements'}
+];
+const WEEK_TIER_SCALE={maintain:.65,build:1,beast:1.35};
+function defaultWeekPlan(mk=thisWeek()){
+  const previousKey=Object.keys(DB.weekPlans||{}).filter(key=>key<mk).sort().reverse()[0];
+  const previous=previousKey&&DB.weekPlans[previousKey];
+  return {
+    tier:previous?.tier||(mk===thisWeek()&&REC_SETS_TIERS[TRAINING_TIER]?TRAINING_TIER:'build'),
+    focus:previous?.focus?Object.assign({},previous.focus):{}
+  };
+}
+function weekPlanFor(mk=thisWeek(),create=false){
+  if(DB.weekPlans&&DB.weekPlans[mk]) return DB.weekPlans[mk];
+  const plan=defaultWeekPlan(mk);
+  if(create){
+    if(!DB.weekPlans||typeof DB.weekPlans!=='object') DB.weekPlans={};
+    DB.weekPlans[mk]=plan;
+  }
+  return plan;
+}
+function weekTierFor(mk=thisWeek()){ return weekPlanFor(mk).tier; }
+function focusGroupForExercise(ex){
+  const group=pplOf(ex);
+  return WEEK_LOADOUT_GROUPS.some(item=>item.id===group)?group:'Other';
+}
+function focusStateFor(group,mk=thisWeek()){
+  const state=weekPlanFor(mk).focus?.[group];
+  return WEEK_FOCUS_STATES.includes(state)?state:'quest';
+}
+function weeklyTargetForExercise(ex,mk=thisWeek()){
+  if(focusStateFor(focusGroupForExercise(ex),mk)!=='quest') return 0;
+  return Math.max(1,Math.ceil((ex.target||1)*(WEEK_TIER_SCALE[weekTierFor(mk)]||1)));
+}
+function weeklyQuestProgress(mk=thisWeek()){
+  let done=0,target=0;
+  DB.exercises.forEach(ex=>{
+    const goal=weeklyTargetForExercise(ex,mk);
+    target+=goal;
+    done+=Math.min(setsFor(ex.id,mk).length,goal);
+  });
+  return {done,target};
+}
 function setScore(s){ return s ? ((s.kg||0)>0 ? (s.kg*1000+s.reps) : s.reps) : 0; }
 function betterSet(a,b){
   if(!a) return b;

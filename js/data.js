@@ -36,13 +36,22 @@ function validateImportedDB(raw){
   if(!Array.isArray(raw.exercises)||!Array.isArray(raw.sets)) return {ok:false,message:"Invalid file"};
   if(raw.workouts!==undefined&&!Array.isArray(raw.workouts)) return {ok:false,message:"Invalid file"};
   if(raw.activeWorkout!==undefined&&raw.activeWorkout!==null&&!isPlainObject(raw.activeWorkout)) return {ok:false,message:"Invalid file"};
+  if(raw.weekPlans!==undefined&&!isPlainObject(raw.weekPlans)) return {ok:false,message:"Invalid file"};
 
   const next=Object.assign(blankDB(), raw, {
     exercises: raw.exercises.map(e=>isPlainObject(e)?Object.assign({}, e):e),
     sets: [],
     workouts: (raw.workouts||[]).map(w=>isPlainObject(w)?Object.assign({}, w, {setIds:Array.isArray(w.setIds)?w.setIds.slice():w.setIds}):w),
-    activeWorkout: isPlainObject(raw.activeWorkout) ? Object.assign({}, raw.activeWorkout, {setIds:Array.isArray(raw.activeWorkout.setIds)?raw.activeWorkout.setIds.slice():raw.activeWorkout.setIds}) : null
+    activeWorkout: isPlainObject(raw.activeWorkout) ? Object.assign({}, raw.activeWorkout, {setIds:Array.isArray(raw.activeWorkout.setIds)?raw.activeWorkout.setIds.slice():raw.activeWorkout.setIds}) : null,
+    weekPlans: isPlainObject(raw.weekPlans) ? Object.fromEntries(Object.entries(raw.weekPlans).map(([mk,plan])=>[mk,isPlainObject(plan)?Object.assign({},plan,{focus:isPlainObject(plan.focus)?Object.assign({},plan.focus):plan.focus}):plan])) : {}
   });
+
+  for(const [mk,plan] of Object.entries(next.weekPlans)){
+    if(!isValidDateKeyValue(mk)||!isPlainObject(plan)||!REC_SETS_TIERS[plan.tier]||!isPlainObject(plan.focus)) return {ok:false,message:"Invalid file"};
+    for(const [group,state] of Object.entries(plan.focus)){
+      if(!WEEK_LOADOUT_GROUPS.some(item=>item.id===group)||!WEEK_FOCUS_STATES.includes(state)) return {ok:false,message:"Invalid file"};
+    }
+  }
 
   const exerciseIds=new Set();
   for(const ex of next.exercises){

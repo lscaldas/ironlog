@@ -4,6 +4,17 @@ IronLog is a static, single-page workout tracker. It can be hosted on GitHub Pag
 
 Product plans (accounts, billing, sync rework, build tooling) are tracked in [docs/ROADMAP.md](docs/ROADMAP.md).
 
+## Weekly quests
+
+The Week screen separates the permanent exercise program from the current week's goal:
+
+- **Quest** groups count toward weekly completion.
+- **Bonus** groups remain available but never make the week incomplete.
+- **Rest** groups are intentionally outside the week's goal but remain fully loggable.
+- Maintain, Build, and Beast modes scale only the current week's quest targets; they do not rewrite the permanent program.
+
+Weekly loadouts are stored by Monday date, survive reload/export/cloud sync, and carry forward as the next week's default. Logging is never restricted by the selected loadout.
+
 ## Data model
 
 Workout data is private to each browser/device and is stored in `localStorage` under `ironlog.v2`.

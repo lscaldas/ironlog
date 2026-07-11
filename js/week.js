@@ -29,7 +29,7 @@ function groupedExercises(mode){
 }
 function groupProgress(items,mk){
   let done=0,target=0;
-  items.forEach(e=>{ done+=Math.min(setsFor(e.id,mk).length,e.target); target+=e.target; });
+  items.forEach(e=>{ const goal=weeklyTargetForExercise(e,mk); done+=Math.min(setsFor(e.id,mk).length,goal); target+=goal; });
   return {done,target};
 }
 function groupVisKey(mode,name){ return `${mode}:${name}`; }
@@ -51,7 +51,8 @@ function sortForWeek(items,mk){
 }
 function renderGroupChips(){
   document.querySelectorAll('#groupSeg .gchip').forEach(b=>b.classList.toggle('on',b.dataset.g===GMODE));
-  document.querySelectorAll('#tierSeg .tchip').forEach(b=>b.classList.toggle('on',b.dataset.t===TRAINING_TIER));
+  const tier=weekTierFor(thisWeek());
+  document.querySelectorAll('#tierSeg .tchip').forEach(b=>b.classList.toggle('on',b.dataset.t===tier));
 }
 function renderMuscleBalance(mk){
   const rows={};
@@ -60,9 +61,10 @@ function renderMuscleBalance(mk){
     const m=muscleOf(e)||'Other';
     const ss=setsFor(e.id,mk);
     const primary=ensure(m);
-    primary.done+=Math.min(ss.length,e.target);
+    const goal=weeklyTargetForExercise(e,mk);
+    primary.done+=Math.min(ss.length,goal);
     primary.actual+=ss.length;
-    primary.target+=e.target;
+    primary.target+=goal;
     primary.effective+=ss.length;
     const secondary=secondaryMuscles(e);
     Object.entries(secondary).forEach(([muscle,weight])=>{
@@ -88,7 +90,7 @@ function renderMuscleBalance(mk){
     const rawPct=target>0?value/target*100:0;
     const pct=value>0?Math.max(3,Math.min(100,rawPct)):3;
     const cls=target>0&&value===0?' ignored':'';
-    const color=value>=target?'var(--good)':value>0?'var(--blue)':'var(--bad)';
+    const color=target>0&&value>=target?'var(--good)':value>0?'var(--blue)':'var(--dim)';
     return `<div class="mrow${cls}" title="${r.actual} direct logged set${r.actual===1?'':'s'} this week">
       <div class="mname">${esc(r.muscle)}</div>
       <div class="mbar"><i style="width:${pct}%;background:${color}"></i></div>
@@ -97,11 +99,12 @@ function renderMuscleBalance(mk){
   }).join(''):`<div class="sub">Add exercises to see weekly muscle balance.</div>`;
 }
 document.querySelectorAll('#tierSeg .tchip').forEach(b=>b.onclick=()=>{
-  TRAINING_TIER=b.dataset.t; localStorage.setItem('ironlog.tier',TRAINING_TIER);
-  // Surface the effect: jump to the effective view where recommended sets live.
-  MBAL_MODE='effective'; localStorage.setItem('ironlog.mbalMode',MBAL_MODE);
-  document.getElementById('mbalCard').classList.remove('closed');
-  renderWeek();
+  const plan=weekPlanFor(thisWeek(),true);
+  plan.tier=b.dataset.t;
+  TRAINING_TIER=plan.tier;
+  localStorage.setItem('ironlog.tier',TRAINING_TIER);
+  save();
+  refreshAll();
   toast(`${TIER_META[TRAINING_TIER].icon} ${TIER_META[TRAINING_TIER].label} week`);
 });
 document.querySelectorAll('#groupSeg .gchip').forEach(b=>b.onclick=()=>{
@@ -116,14 +119,67 @@ document.querySelectorAll('#mbalMode button').forEach(b=>b.onclick=e=>{
   renderMuscleBalance(thisWeek());
 });
 
+function setWeeklyFocus(group,state){
+  if(!WEEK_FOCUS_STATES.includes(state)) return;
+  const plan=weekPlanFor(thisWeek(),true);
+  plan.focus[group]=state;
+  save();
+  refreshAll();
+  const labels={quest:'Quest',bonus:'Bonus',rest:'Rest'};
+  toast(`${group} set to ${labels[state]}`);
+}
+function loadoutGroupExercises(group){ return DB.exercises.filter(ex=>focusGroupForExercise(ex)===group); }
+function loadoutProgress(group,mk){
+  const exercises=loadoutGroupExercises(group);
+  const state=focusStateFor(group,mk);
+  const actual=exercises.reduce((sum,ex)=>sum+setsFor(ex.id,mk).length,0);
+  const target=exercises.reduce((sum,ex)=>sum+weeklyTargetForExercise(ex,mk),0);
+  const done=exercises.reduce((sum,ex)=>sum+Math.min(setsFor(ex.id,mk).length,weeklyTargetForExercise(ex,mk)),0);
+  return {exercises,state,actual,target,done};
+}
+function renderWeeklyLoadout(mk){
+  const list=document.getElementById('loadoutList');
+  const groups=WEEK_LOADOUT_GROUPS.filter(group=>loadoutGroupExercises(group.id).length||group.id!=='Other');
+  list.innerHTML=groups.map(group=>{
+    const p=loadoutProgress(group.id,mk);
+    const pct=p.target?Math.min(100,Math.round(p.done/p.target*100)):0;
+    const metric=p.state==='quest'?`${p.done}/${p.target}`:(p.actual?`${p.actual} logged`:'Optional');
+    return `<div class="loadout-row role-${p.state}" data-loadout-group="${group.id}">
+      <div class="ability-icon" aria-hidden="true">${group.icon}</div>
+      <div class="ability-copy"><div><b>${group.ability}</b><span>${group.id}</span></div><small>${group.muscles}</small>
+        <div class="ability-bar"><i style="width:${pct}%"></i></div></div>
+      <div class="ability-state"><span>${metric}</span><select aria-label="${group.id} weekly role" data-focus-group="${group.id}">
+        <option value="quest" ${p.state==='quest'?'selected':''}>Quest</option>
+        <option value="bonus" ${p.state==='bonus'?'selected':''}>Bonus</option>
+        <option value="rest" ${p.state==='rest'?'selected':''}>Rest</option>
+      </select></div>
+    </div>`;
+  }).join('');
+  list.querySelectorAll('select[data-focus-group]').forEach(select=>select.onchange=()=>setWeeklyFocus(select.dataset.focusGroup,select.value));
+}
+function renderNextQuests(mk){
+  const candidates=DB.exercises.map(ex=>{
+    const target=weeklyTargetForExercise(ex,mk);
+    const done=Math.min(setsFor(ex.id,mk).length,target);
+    return {ex,target,done,left:Math.max(0,target-done)};
+  }).filter(item=>item.target>0&&item.left>0).sort((a,b)=>a.done/a.target-b.done/b.target||b.left-a.left).slice(0,3);
+  document.getElementById('nextQuestSub').textContent=candidates.length?`${candidates.length} suggested moves`:'';
+  const list=document.getElementById('nextQuestList');
+  list.innerHTML=candidates.length?candidates.map(item=>{
+    const group=WEEK_LOADOUT_GROUPS.find(entry=>entry.id===focusGroupForExercise(item.ex));
+    return `<div class="next-quest" data-exid="${esc(item.ex.id)}"><div><b>${esc(item.ex.name)}</b><span>${item.left} set${item.left===1?'':'s'} left · ${group?.ability||'Wildcard'} XP</span></div>
+      <button type="button" title="Log set" aria-label="Log set for ${esc(item.ex.name)}">＋</button></div>`;
+  }).join(''):`<div class="quest-clear"><b>Quest clear</b><span>Your selected weekly targets are complete. Every exercise is still available below.</span></div>`;
+  list.querySelectorAll('.next-quest button').forEach(button=>button.onclick=()=>{ const ex=exerciseById(button.closest('.next-quest').dataset.exid); if(ex) openLog(ex); });
+}
+
 function renderWeek(){
   const mk=thisWeek();
+  TRAINING_TIER=weekTierFor(mk);
   document.getElementById('weekLabel').textContent="Week of "+weekLabel(mk);
   const exs=DB.exercises;
   document.getElementById('weekEmpty').style.display=exs.length?'none':'block';
-  // totals
-  let doneT=0,tgtT=0;
-  exs.forEach(e=>{ doneT+=Math.min(setsFor(e.id,mk).length,e.target); tgtT+=e.target; });
+  const {done:doneT,target:tgtT}=weeklyQuestProgress(mk);
   const pct=tgtT?Math.round(doneT/tgtT*100):0;
   const ring=document.getElementById('ring');
   const col=pct>=100?'var(--good)':'var(--accent)';
@@ -131,8 +187,13 @@ function renderWeek(){
   document.getElementById('ringPct').textContent=pct+"%";
   document.getElementById('ringTxt').textContent=doneT+"/"+tgtT+" sets";
   document.getElementById('weekHead').textContent =
-    !tgtT?"Add exercises to begin": pct>=100?"Week complete — beast 🔥": doneT===0?"Fresh week. Let's go 💪":(tgtT-doneT)+" sets to go this week";
+    !tgtT?"Free training week": pct>=100?"Quest complete 🔥": doneT===0?"Choose your path. Start anywhere.":(tgtT-doneT)+" quest sets remaining";
+  const tierLabels={maintain:'Maintain',build:'Build',beast:'Beast'};
+  const tierNotes={maintain:'Light recovery-friendly volume',build:'Balanced progression',beast:'High-volume challenge'};
+  document.getElementById('tierSummary').textContent=`${tierLabels[TRAINING_TIER]} · ${tierNotes[TRAINING_TIER]} · ${tgtT} quest sets`;
   renderGroupChips();
+  renderWeeklyLoadout(mk);
+  renderNextQuests(mk);
   renderMuscleBalance(mk);
   renderWorkoutPanel();
 
@@ -141,10 +202,13 @@ function renderWeek(){
   groups.forEach(([b,rawItems])=>{
     const items=sortForWeek(rawItems,mk);
     const {done:bd,target:bt}=groupProgress(items,mk);
+    const roles=[...new Set(items.map(ex=>focusStateFor(focusGroupForExercise(ex),mk)))];
+    const role=roles.length===1?roles[0]:'mixed';
     const visible=isGroupVisible(GMODE,b);
-    const section=document.createElement('div'); section.className='group-section'+(visible?'':' collapsed');
+    const section=document.createElement('div'); section.className=`group-section group-${role}`+(visible?'':' collapsed');
     const head=document.createElement('div'); head.className='bucket-h';
-    head.innerHTML=`<h2>${esc(b)}</h2><div class="ln"></div><div class="bcount">${bd}/${bt}</div><button class="group-toggle ${visible?'on':''}" type="button">${visible?'Hide':'Show'}</button>`;
+    const count=bt?`${bd}/${bt}`:(role==='rest'?'Rest':role==='bonus'?'Bonus':'Optional');
+    head.innerHTML=`<h2>${esc(b)}</h2><span class="group-role role-${role}">${role}</span><div class="ln"></div><div class="bcount">${count}</div><button class="group-toggle ${visible?'on':''}" type="button">${visible?'Hide':'Show'}</button>`;
     head.querySelector('.group-toggle').onclick=()=>toggleGroup(GMODE,b);
     section.appendChild(head);
     items.forEach(e=>section.appendChild(exCard(e,mk)));
@@ -155,13 +219,15 @@ function renderWeek(){
 function exCard(e,mk){
   const sets=setsFor(e.id,mk).sort((a,b)=>a.ts-b.ts);
   const done=sets.length;
-  const isDone=done>=e.target;
+  const target=weeklyTargetForExercise(e,mk);
+  const focusState=focusStateFor(focusGroupForExercise(e),mk);
+  const isDone=target>0&&done>=target;
   const sg=suggest(e);
-  const node=document.createElement('div'); node.className='ex'+(isDone?' done':'');
+  const node=document.createElement('div'); node.className=`ex focus-${focusState}`+(isDone?' done':'');
   // dots — one per target set, extras dashed
   let dots='';
-  for(let i=0;i<e.target;i++) dots+=`<span class="dot ${i<done?'fill':''}">${i<done?'✓':''}</span>`;
-  for(let i=e.target;i<done;i++) dots+=`<span class="dot fill extra">+</span>`;
+  for(let i=0;i<target;i++) dots+=`<span class="dot ${i<done?'fill':''}">${i<done?'✓':''}</span>`;
+  for(let i=target;i<done;i++) dots+=`<span class="dot fill extra">+</span>`;
   // this week's sets, compact
   const best=bestSet(sets);
   const chips=sets.map(s=>`<span class="wkchip ${best&&s.id===best.id&&done>1?'best':''}"><b>${s.reps}</b>×${fmtW(s.kg)}<button class="editSet" type="button" data-sid="${esc(s.id)}" aria-label="Edit set ${s.reps} by ${fmtW(s.kg)}">Edit</button><button class="x" type="button" data-sid="${esc(s.id)}" aria-label="Remove set ${s.reps} by ${fmtW(s.kg)}">x</button></span>`).join('');
@@ -171,7 +237,7 @@ function exCard(e,mk){
     <div class="ex-top">
       <div class="ex-main">
         <div class="exname">${esc(e.name)}</div>
-        <div class="ex-meta"><span class="dots">${dots}</span><span class="remain">${isDone?'done ✓':'<b>'+done+'</b>/'+e.target}</span></div>
+        <div class="ex-meta"><span class="dots">${dots}</span><span class="remain">${target?(isDone?'done ✓':'<b>'+Math.min(done,target)+'</b>/'+target):`<b>${done}</b> logged · ${focusState}`}</span></div>
         <div class="exsub">${tip}</div>
         ${matchNote?`<div class="match-note">${matchNote}</div>`:''}
       </div>
@@ -206,7 +272,11 @@ function openLog(e){
   logEx=e; const sg=suggest(e);
   document.getElementById('logTitle').textContent=e.name;
   const sets=setsFor(e.id,thisWeek()).length;
-  document.getElementById('logSub').textContent=`Set ${sets+1} of ${e.target} this week · ${muscleOf(e)||e.bucket||''}`;
+  const target=weeklyTargetForExercise(e,thisWeek());
+  const state=focusStateFor(focusGroupForExercise(e),thisWeek());
+  document.getElementById('logSub').textContent=target
+    ? `Set ${sets+1} of ${target} this quest · ${muscleOf(e)||e.bucket||''}`
+    : `${state==='rest'?'Rest-day training':'Bonus training'} · always available · ${muscleOf(e)||e.bucket||''}`;
   document.getElementById('inReps').value=sg.reps;
   document.getElementById('inKg').value=sg.kg;
   const hint=document.getElementById('logHint'); hint.className='sugg '+(sg.up?'up':''); hint.innerHTML=`<span class="ic">💡</span><span class="m">${sg.msg}</span>`;
@@ -278,7 +348,7 @@ function doUpdateSet(){
   save();
   return true;
 }
-document.getElementById('saveSetBtn').onclick=()=>{ if(editSetId){ if(doUpdateSet()){ closeSheets(); refreshAll(); toast("Set updated"); } else setLogButtonsBusy(false); return; } if(doLog()){ closeSheets(); renderWeek(); const r=Math.max(0,logEx.target-setsFor(logEx.id,thisWeek()).length); toast(r?`Logged ✓ — ${r} left`:`${logEx.name} complete! ✓`); } else setLogButtonsBusy(false); };
+document.getElementById('saveSetBtn').onclick=()=>{ if(editSetId){ if(doUpdateSet()){ closeSheets(); refreshAll(); toast("Set updated"); } else setLogButtonsBusy(false); return; } if(doLog()){ const state=focusStateFor(focusGroupForExercise(logEx),thisWeek()); const target=weeklyTargetForExercise(logEx,thisWeek()); closeSheets(); renderWeek(); const r=Math.max(0,target-setsFor(logEx.id,thisWeek()).length); toast(state==='quest'?(r?`Quest +1 · ${r} left`:`${logEx.name} quest clear! ✓`):`${state==='rest'?'Free training':'Bonus XP'} · set logged ✓`); } else setLogButtonsBusy(false); };
 document.getElementById('saveSetMoreBtn').onclick=()=>{ if(doLog()){ const e=logEx; renderWeek(); openLog(e); toast("Logged ✓"); } else setLogButtonsBusy(false); };
 
 /* ================= Finish workout ================= */
@@ -312,7 +382,7 @@ function openFinish(){
     `<span class="wkchip">${esc(m)} <b>${c}</b></span>`).join('');
 
   const remaining=groupedExercises('muscle').map(([m,items])=>{
-    const left=items.reduce((a,e)=>a+Math.max(0,e.target-setsFor(e.id,mk).length),0);
+    const left=items.reduce((a,e)=>a+Math.max(0,weeklyTargetForExercise(e,mk)-setsFor(e.id,mk).length),0);
     return {m,left};
   }).filter(r=>r.left>0).sort((a,b)=>b.left-a.left);
   const remTxt=remaining.length

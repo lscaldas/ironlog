@@ -21,10 +21,9 @@ function renderStats(){
   document.getElementById('aSets').textContent=new Set(sets.map(s=>s.exId)).size;
   // weekly target hit %
   const wks=weeks;
-  const tgtTotal=DB.exercises.reduce((a,e)=>a+e.target,0);
   let hitSum=0,wkCount=0;
-  wks.forEach(mk=>{ if(mk>thisWeek())return; let done=0; DB.exercises.forEach(e=>done+=Math.min(setsFor(e.id,mk).length,e.target));
-    if(setsForWeekAny(mk)||mk===thisWeek()){ hitSum+=tgtTotal?done/tgtTotal:0; wkCount++; } });
+  wks.forEach(mk=>{ if(mk>thisWeek())return; const progress=weeklyQuestProgress(mk);
+    if(setsForWeekAny(mk)||mk===thisWeek()){ hitSum+=progress.target?progress.done/progress.target:0; wkCount++; } });
   document.getElementById('aHit').textContent=(wkCount?Math.round(hitSum/wkCount*100):0)+"%";
 
   drawSets(weeks);
@@ -73,7 +72,7 @@ function setupCanvas(cv){
 function drawSets(weeks){
   const cv=document.getElementById('setsChart'); const {ctx,w,h}=setupCanvas(cv); ctx.clearRect(0,0,w,h);
   const data=weeks.map(mk=>DB.sets.filter(s=>mondayOf(s.date)===mk).length);
-  const tgt=DB.exercises.reduce((a,e)=>a+e.target,0);
+  const tgt=weeklyQuestProgress(thisWeek()).target;
   document.getElementById('targetLineLbl').textContent=tgt?('target '+tgt+'/wk'):'';
   const pad={l:6,r:6,t:14,b:20}; const max=Math.max(tgt,...data,1);
   const bw=(w-pad.l-pad.r)/data.length; const Y=v=>h-pad.b-(v/max)*(h-pad.t-pad.b);

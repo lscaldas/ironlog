@@ -3,11 +3,25 @@
 function esc(s){ return (s||"").replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
 function normalizeDB(){
   let dirty=false;
-  if(DB.schemaVersion!==3){ DB.schemaVersion=3; dirty=true; }
+  if(DB.schemaVersion!==4){ DB.schemaVersion=4; dirty=true; }
   if(DB.initialized!==true && (DB.exercises?.length||DB.sets?.length)){ DB.initialized=true; dirty=true; }
   if(!Array.isArray(DB.exercises)){ DB.exercises=[]; dirty=true; }
   if(!Array.isArray(DB.sets)){ DB.sets=[]; dirty=true; }
   if(!Array.isArray(DB.workouts)){ DB.workouts=[]; dirty=true; }
+  if(!DB.weekPlans || typeof DB.weekPlans!=='object' || Array.isArray(DB.weekPlans)){ DB.weekPlans={}; dirty=true; }
+  Object.keys(DB.weekPlans).forEach(mk=>{
+    const plan=DB.weekPlans[mk];
+    if(!/^\d{4}-\d{2}-\d{2}$/.test(mk)||!plan||typeof plan!=='object'||Array.isArray(plan)){
+      delete DB.weekPlans[mk]; dirty=true; return;
+    }
+    if(!REC_SETS_TIERS[plan.tier]){ plan.tier='build'; dirty=true; }
+    if(!plan.focus||typeof plan.focus!=='object'||Array.isArray(plan.focus)){ plan.focus={}; dirty=true; }
+    Object.keys(plan.focus).forEach(group=>{
+      if(!WEEK_LOADOUT_GROUPS.some(item=>item.id===group)||!WEEK_FOCUS_STATES.includes(plan.focus[group])){
+        delete plan.focus[group]; dirty=true;
+      }
+    });
+  });
   if(!DB.activeWorkout || typeof DB.activeWorkout!=='object' || DB.activeWorkout.status!=='active'){
     if(DB.activeWorkout!==null){ dirty=true; }
     DB.activeWorkout=null;

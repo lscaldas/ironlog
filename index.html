@@ -38,20 +38,37 @@
 
   <!-- ===== WEEK ===== -->
   <section class="view active" id="v-week">
-    <div class="hero">
-      <div class="ring" id="ring"><div class="inner"><div><b id="ringPct">0%</b><br><span id="ringTxt">0/0 sets</span></div></div></div>
-      <div class="hero-info">
-        <div class="wk" id="weekLabel">This week</div>
-        <div class="big" id="weekHead">Let's get those sets in</div>
+    <div class="hero quest-hero">
+      <div class="quest-kicker"><span>Current mission</span><div class="wk" id="weekLabel">This week</div></div>
+      <div class="quest-main">
+        <div class="ring" id="ring"><div class="inner"><div><b id="ringPct">0%</b><br><span id="ringTxt">0/0 sets</span></div></div></div>
+        <div class="hero-info">
+          <h2>Weekly quest</h2>
+          <div class="big" id="weekHead">Let's get those sets in</div>
+          <div class="tier-summary" id="tierSummary"></div>
+        </div>
       </div>
-      <div class="hero-tier" id="tierSeg" title="Training week — scales recommended sets">
-        <button class="tchip" data-t="maintain">🍃 Maintaining</button>
-        <button class="tchip" data-t="build">💪 Building</button>
-        <button class="tchip" data-t="beast">🔥 Beast mode</button>
+      <div class="hero-tier" id="tierSeg" title="Choose how demanding this week's quest should be">
+        <button class="tchip" data-t="maintain"><span>🍃</span><b>Maintain</b><small>Light</small></button>
+        <button class="tchip" data-t="build"><span>⚔️</span><b>Build</b><small>Balanced</small></button>
+        <button class="tchip" data-t="beast"><span>🔥</span><b>Beast</b><small>High volume</small></button>
       </div>
     </div>
 
     <div class="workout-panel" id="workoutPanel"></div>
+
+    <div class="card loadout-card" id="questLoadout">
+      <div class="loadout-head">
+        <div><div class="eyebrow">Weekly loadout</div><h2>Choose what counts</h2></div>
+        <div class="sub">Quest affects completion. Bonus and Rest never block the week.</div>
+      </div>
+      <div class="loadout-list" id="loadoutList"></div>
+    </div>
+
+    <div class="card next-quest-card">
+      <div class="card-h"><div><div class="eyebrow">Recommended, never locked</div><h2>Next quest</h2></div><div class="sub" id="nextQuestSub"></div></div>
+      <div class="next-quest-list" id="nextQuestList"></div>
+    </div>
 
     <div class="glabel">Group by</div>
     <div class="gchips" id="groupSeg">
@@ -62,7 +79,7 @@
 
   <div class="card mbalCard closed" id="mbalCard">
       <div class="mbal-h" id="mbalToggle">
-        <div class="card-h mbal-title" style="margin:0;"><h2>This week by muscle</h2><div class="sub" id="mbalSub"></div></div>
+        <div class="card-h mbal-title" style="margin:0;"><h2>Muscle detail</h2><div class="sub" id="mbalSub"></div></div>
         <div class="mbal-tools">
           <div class="mini-seg" id="mbalMode">
             <button type="button" data-m="plan" class="on">Plan</button>
