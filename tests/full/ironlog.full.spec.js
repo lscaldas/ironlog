@@ -268,7 +268,7 @@ test('weekly loadout picker shows once, hides deselected groups, and persists', 
   await expect(setup, 'The picker should disappear after the weekly choice is locked in.').toBeHidden();
   await expect(page.locator('#weekFocusRow')).toBeVisible();
   await expect(cableSquats, 'Deselected Legs exercises should hide to keep the screen focused.').toHaveCount(0);
-  await expect(page.locator('#ringTxt'), 'Deselected muscle groups must not count against this week.').toHaveText('0/6 muscles');
+  await expect(page.locator('#mbalList .mrow'), 'Deselected muscle groups must leave the weekly decision surface.').toHaveCount(6);
   await expect(page.locator('#mbalList .mrow', { hasText: 'Quads' }), 'Deselected muscle bars should leave the decision surface.').toHaveCount(0);
   await expect(page.locator('#weekList .ex', { hasText: 'Pullups' })).toBeVisible();
 
@@ -284,7 +284,18 @@ test('muscle bars stack tier lives, stay central, and exercises show per-set con
   const name = profileName(testInfo);
   await openLocalProfile(page, name);
 
+  await expect(page.locator('.quest-hero'), 'The redundant mission summary should not compete with the muscle bars.').toHaveCount(0);
   await expect(page.locator('#mbalCard'), 'Muscle bars are the central decision surface.').toBeVisible();
+  await expect(page.locator('#mbalCard .tier-legend')).toHaveText(/Maintain.*Build.*Beast/);
+  const tierColors = await page.evaluate(() => {
+    const root = getComputedStyle(document.documentElement);
+    return ['--tier-maintain', '--tier-build', '--tier-beast'].map((name) => root.getPropertyValue(name).trim());
+  });
+  expect(tierColors, 'Tier colors should escalate from readiness to effort to maximum intensity.').toEqual([
+    '#38d9a9',
+    '#f3b64c',
+    '#ff5d73',
+  ]);
   const pullups = page.locator('#weekList .ex', { hasText: 'Pullups' });
   await expect(pullups.locator('.contrib', { hasText: /\+1 Back/i }), 'Each exercise must state what one set feeds into the bars.').toBeVisible();
   await expect(pullups.locator('.contrib', { hasText: /Biceps/i })).toBeVisible();
@@ -303,7 +314,6 @@ test('muscle bars stack tier lives, stay central, and exercises show per-set con
 
   await expect(backRow.locator('.val'), 'Clearing maintain should roll the bar into the next tier.').toHaveText('4 / 8');
   await expect(backRow.locator('.pip.on'), 'The first tier life should light up once maintained.').toHaveCount(1);
-  await expect(page.locator('#ringTxt')).toContainText(/muscles/i);
 
   await page.reload();
   await expect(page.locator('#mbalList .mrow', { hasText: 'Back' }).first().locator('.val')).toHaveText('4 / 8');
@@ -525,17 +535,19 @@ test('mobile weekly quest keeps setup compact and filters on one row', async ({ 
     return {
       viewportWidth: document.documentElement.clientWidth,
       scrollWidth: document.documentElement.scrollWidth,
-      heroHeight: height('.quest-hero'),
+      heroCount: document.querySelectorAll('.quest-hero').length,
       setupHeight: height('#weekSetup'),
       barsVisible: Boolean(bars) && getComputedStyle(bars).display !== 'none',
+      barsTop: Math.round(bars.getBoundingClientRect().top),
       groupRows: new Set(groupTops).size,
     };
   });
 
   expect(layout.scrollWidth, 'Mobile dashboard must not overflow horizontally.').toBeLessThanOrEqual(layout.viewportWidth);
-  expect(layout.heroHeight, 'Weekly hero should not dominate the phone viewport.').toBeLessThanOrEqual(205);
+  expect(layout.heroCount, 'The redundant mission hero should be removed on mobile too.').toBe(0);
   expect(layout.setupHeight, 'The weekly loadout picker should stay compact on a phone.').toBeLessThanOrEqual(300);
   expect(layout.barsVisible, 'Muscle bars are the core mechanic and must stay visible on mobile.').toBe(true);
+  expect(layout.barsTop, 'Removing the hero should bring the core mechanic into the first phone viewport.').toBeLessThan(650);
   expect(layout.groupRows, 'Mobile grouping controls should stay on one row.').toBe(1);
 });
 
