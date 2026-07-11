@@ -250,46 +250,63 @@ test('T-015 invalid weights are rejected without creating sets', async ({ page }
   await expect(loggedSetChips(page)).toHaveCount(0);
 });
 
-test('weekly loadout excludes rested groups without locking their exercises', async ({ page }, testInfo) => {
+test('weekly loadout picker shows once, hides deselected groups, and persists', async ({ page }, testInfo) => {
   const name = profileName(testInfo);
   await openLocalProfile(page, name);
 
-  await expect(page.getByRole('heading', { name: /^Weekly quest$/i })).toBeVisible();
-  await expect(page.getByRole('heading', { name: /^Next quest$/i })).toBeVisible();
-  await expect(page.locator('#ringTxt')).toHaveText('0/50 sets');
+  const setup = page.locator('#weekSetup');
+  await expect(setup, 'A fresh week should surface the loadout picker.').toBeVisible();
+  await expect(page.getByRole('heading', { name: /Next quest/i })).toHaveCount(0);
+  await expect(page.locator('#tierSeg')).toHaveCount(0);
 
-  const legsRole = page.getByLabel('Legs weekly role', { exact: true });
-  await legsRole.selectOption('rest');
-  await expect(page.locator('#ringTxt')).toHaveText('0/40 sets');
-
-  await startWorkout(page);
   const cableSquats = page.locator('#weekList .ex', { hasText: 'Cable Squats' });
   await expect(cableSquats).toBeVisible();
-  await cableSquats.locator('button[title="Log set"]').click();
-  await fillSet(page, '8', '20');
-  await page.getByRole('button', { name: /Log this set/i }).click();
 
-  await expect(cableSquats.locator('.wkchip')).toHaveCount(1);
-  await expect(page.locator('#ringTxt'), 'Rest-group sets should not inflate or reduce the chosen quest.').toHaveText('0/40 sets');
+  await setup.locator('.setup-chip', { hasText: 'Legs' }).click();
+  await page.getByRole('button', { name: /Lock in this week/i }).click();
+
+  await expect(setup, 'The picker should disappear after the weekly choice is locked in.').toBeHidden();
+  await expect(page.locator('#weekFocusRow')).toBeVisible();
+  await expect(cableSquats, 'Deselected Legs exercises should hide to keep the screen focused.').toHaveCount(0);
+  await expect(page.locator('#ringTxt'), 'Deselected muscle groups must not count against this week.').toHaveText('0/6 muscles');
+  await expect(page.locator('#mbalList .mrow', { hasText: 'Quads' }), 'Deselected muscle bars should leave the decision surface.').toHaveCount(0);
+  await expect(page.locator('#weekList .ex', { hasText: 'Pullups' })).toBeVisible();
 
   await page.reload();
-  await expect(page.getByLabel('Legs weekly role', { exact: true })).toHaveValue('rest');
-  await expect(cableSquats.locator('.wkchip')).toHaveCount(1);
-  await expect(page.locator('#ringTxt')).toHaveText('0/40 sets');
+  await expect(page.locator('#weekSetup'), 'The weekly choice should stick — no picker again this week.').toBeHidden();
+  await expect(page.locator('#weekList .ex', { hasText: 'Cable Squats' })).toHaveCount(0);
+
+  await page.locator('#weekFocusRow').getByRole('button', { name: /Change/i }).click();
+  await expect(page.locator('#weekSetup'), 'Change should reopen the picker.').toBeVisible();
 });
 
-test('training mode visibly changes and persists the weekly quest target', async ({ page }, testInfo) => {
+test('muscle bars stack tier lives, stay central, and exercises show per-set contributions', async ({ page }, testInfo) => {
   const name = profileName(testInfo);
   await openLocalProfile(page, name);
-  await expect(page.locator('#ringTxt')).toHaveText('0/50 sets');
 
-  await page.locator('#tierSeg button[data-t="maintain"]').click();
-  await expect(page.locator('#ringTxt')).toHaveText('0/38 sets');
-  await expect(page.locator('#tierSummary')).toContainText(/Maintain.*38 quest sets/i);
+  await expect(page.locator('#mbalCard'), 'Muscle bars are the central decision surface.').toBeVisible();
+  const pullups = page.locator('#weekList .ex', { hasText: 'Pullups' });
+  await expect(pullups.locator('.contrib', { hasText: /\+1 Back/i }), 'Each exercise must state what one set feeds into the bars.').toBeVisible();
+  await expect(pullups.locator('.contrib', { hasText: /Biceps/i })).toBeVisible();
+
+  const backRow = page.locator('#mbalList .mrow', { hasText: 'Back' }).first();
+  await expect(backRow.locator('.val'), 'Set values stay centered on the bar.').toHaveText('0 / 4');
+  await expect(backRow.locator('.pip.on')).toHaveCount(0);
+
+  await startWorkout(page);
+  for (let i = 0; i < 4; i += 1) {
+    await pullups.locator('button[title="Log set"]').click();
+    await fillSet(page, String(8 + i), '0');
+    await page.getByRole('button', { name: /Log this set/i }).click();
+    await expect(pullups.locator('.wkchip')).toHaveCount(i + 1);
+  }
+
+  await expect(backRow.locator('.val'), 'Clearing maintain should roll the bar into the next tier.').toHaveText('4 / 8');
+  await expect(backRow.locator('.pip.on'), 'The first tier life should light up once maintained.').toHaveCount(1);
+  await expect(page.locator('#ringTxt')).toContainText(/muscles/i);
 
   await page.reload();
-  await expect(page.locator('#ringTxt')).toHaveText('0/38 sets');
-  await expect(page.locator('#tierSeg button[data-t="maintain"]')).toHaveClass(/on/);
+  await expect(page.locator('#mbalList .mrow', { hasText: 'Back' }).first().locator('.val')).toHaveText('4 / 8');
 });
 
 test('T-020 visible set removal recalculates statistics after reload', async ({ page }, testInfo) => {
@@ -504,20 +521,21 @@ test('mobile weekly quest keeps setup compact and filters on one row', async ({ 
     const height = (selector) => Math.round(document.querySelector(selector).getBoundingClientRect().height);
     const groupTops = [...document.querySelectorAll('#groupSeg button')]
       .map((button) => Math.round(button.getBoundingClientRect().top));
+    const bars = document.querySelector('#mbalCard');
     return {
       viewportWidth: document.documentElement.clientWidth,
       scrollWidth: document.documentElement.scrollWidth,
       heroHeight: height('.quest-hero'),
-      loadoutHeight: height('#questLoadout'),
-      nextQuestHeight: height('.next-quest-card'),
+      setupHeight: height('#weekSetup'),
+      barsVisible: Boolean(bars) && getComputedStyle(bars).display !== 'none',
       groupRows: new Set(groupTops).size,
     };
   });
 
   expect(layout.scrollWidth, 'Mobile dashboard must not overflow horizontally.').toBeLessThanOrEqual(layout.viewportWidth);
   expect(layout.heroHeight, 'Weekly hero should not dominate the phone viewport.').toBeLessThanOrEqual(205);
-  expect(layout.loadoutHeight, 'The four weekly roles should fit in a compact 2x2 loadout.').toBeLessThanOrEqual(250);
-  expect(layout.nextQuestHeight, 'Recommendations should remain a short actionable list.').toBeLessThanOrEqual(125);
+  expect(layout.setupHeight, 'The weekly loadout picker should stay compact on a phone.').toBeLessThanOrEqual(300);
+  expect(layout.barsVisible, 'Muscle bars are the core mechanic and must stay visible on mobile.').toBe(true);
   expect(layout.groupRows, 'Mobile grouping controls should stay on one row.').toBe(1);
 });
 
