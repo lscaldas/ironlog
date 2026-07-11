@@ -3,6 +3,17 @@ const { test, expect } = require('@playwright/test');
 
 const gateHeading = /Open IronLog/i;
 
+test('app shell cache-busts UI assets with the service-worker version', async () => {
+  const index = fs.readFileSync('index.html', 'utf8');
+  const serviceWorker = fs.readFileSync('sw.js', 'utf8');
+  const version = serviceWorker.match(/ironlog-static-v(\d+)/)?.[1];
+
+  expect(version, 'Service worker should expose a numeric app-shell version.').toBeTruthy();
+  expect(index).toContain(`styles.css?v=${version}`);
+  expect(index).toContain(`js/week.js?v=${version}`);
+  expect(serviceWorker).toContain("fetch(event.request, {cache:'no-store'})");
+});
+
 async function resetBrowserState(page) {
   await page.goto('/');
   await page.evaluate(async () => {
