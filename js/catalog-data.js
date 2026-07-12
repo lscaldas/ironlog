@@ -40,8 +40,14 @@ const NAME_AREA={"Rows":"Mid back / lats","Cable Rows":"Mid back / lats","Pullup
   "Cable Lateral Raise - Upper Path":"Side delts - upper path","Triceps Pulldown":"Lateral / medial head",
   "Triceps Overhead Ext.":"Triceps long head","Biceps Curls":"Biceps","Bayesian Single-arm Curl":"Biceps","Shrugs":"Upper traps","Single-arm Cable Shrugs":"Upper traps",
   "Squats":"Quads / glutes","Cable Squats":"Quads / glutes","Leg Curls":"Hamstrings","Single Cable Leg Curl":"Hamstrings","Calf Raises":"Calves","Cable Single-leg Calf Raise":"Calves"};
+/* Secondary weights = fraction of a direct set's stimulus the muscle receives.
+   Rubric (EMG + longitudinal indirect-growth data, e.g. pressing→triceps,
+   pulldowns→biceps): ~.5 heavy synergist through full ROM, .2–.35 moderate
+   synergist, .1–.15 stabilizer/isometric. Grip (forearm flexors +
+   brachioradialis) is counted on unsupported pulls and hangs, scaled to load:
+   bodyweight hang ≈ .3, heavy bar pull ≈ .25, cable/machine handle ≈ .15–.2. */
 const EXERCISE_TAXONOMY=[
-  {base:"Pushups", muscle:"Chest", area:"Mid chest", keys:["pushup","push-up","push up"], secondary:{Triceps:.45,Shoulders:.35}},
+  {base:"Pushups", muscle:"Chest", area:"Mid chest", keys:["pushup","push-up","push up"], secondary:{Triceps:.45,Shoulders:.35,Core:.1}},
   {base:"Bench Press", muscle:"Chest", area:"Mid chest", keys:["bench","bench press","press bench","barbell bench"], secondary:{Triceps:.45,Shoulders:.35}},
   {base:"Incline Bench Press", muscle:"Chest", area:"Upper chest", keys:["incline bench","incline press","incline dumbbell press","incline db press"], secondary:{Shoulders:.45,Triceps:.4}},
   {base:"Dumbbell Press", muscle:"Chest", area:"Mid chest", keys:["dumbbell press","db press","flat dumbbell press"], secondary:{Triceps:.4,Shoulders:.3}},
@@ -57,26 +63,26 @@ const EXERCISE_TAXONOMY=[
   {base:"Incline Pushups", muscle:"Chest", area:"Mid chest", keys:["incline pushup","incline push-up","incline push up"], secondary:{Shoulders:.35,Triceps:.35,Core:.1}},
   {base:"Decline Pushups", muscle:"Chest", area:"Upper chest", keys:["decline pushup","decline push-up","decline push up"], secondary:{Shoulders:.45,Triceps:.35,Core:.1}},
 
-  {base:"Pullups", muscle:"Back", area:"Lats", keys:["pullup","pull-up","pull up"], secondary:{Biceps:.5,Traps:.2}},
-  {base:"Chin-ups", muscle:"Back", area:"Lats", keys:["chinup","chin-up","chin up"], secondary:{Biceps:.65,Traps:.2}},
-  {base:"Lat Pulldown", muscle:"Back", area:"Lats", keys:["lat pulldown","pulldown","pull down"], secondary:{Biceps:.5,Shoulders:.25,Traps:.2}},
-  {base:"Single-arm Lat Pulldown", muscle:"Back", area:"Lats", keys:["single arm lat pulldown","one arm lat pulldown","single-arm pulldown"], secondary:{Biceps:.45,Shoulders:.25,Traps:.2}},
+  {base:"Pullups", muscle:"Back", area:"Lats", keys:["pullup","pull-up","pull up"], secondary:{Biceps:.5,Traps:.2,Forearms:.3}},
+  {base:"Chin-ups", muscle:"Back", area:"Lats", keys:["chinup","chin-up","chin up"], secondary:{Biceps:.65,Traps:.2,Forearms:.3}},
+  {base:"Lat Pulldown", muscle:"Back", area:"Lats", keys:["lat pulldown","pulldown","pull down"], secondary:{Biceps:.5,Shoulders:.25,Traps:.2,Forearms:.2}},
+  {base:"Single-arm Lat Pulldown", muscle:"Back", area:"Lats", keys:["single arm lat pulldown","one arm lat pulldown","single-arm pulldown"], secondary:{Biceps:.45,Shoulders:.25,Traps:.2,Forearms:.2}},
   {base:"Straight-arm Pulldown", muscle:"Back", area:"Lats", keys:["straight arm pulldown","straight-arm pulldown","cable pullover"], secondary:{Triceps:.15}},
-  {base:"Cable Rows", muscle:"Back", area:"Mid back / lats", keys:["row","rows","cable row","seated row"], secondary:{Biceps:.5,Traps:.35,Shoulders:.25}},
-  {base:"High Cable Row", muscle:"Back", area:"Upper back", keys:["high cable row","face away cable row","upper cable row"], secondary:{Biceps:.45,Traps:.45,Shoulders:.35}},
-  {base:"Single-arm Cable Row", muscle:"Back", area:"Mid back / lats", keys:["single arm cable row","one arm cable row","single-arm cable row"], secondary:{Biceps:.5,Traps:.35,Shoulders:.25}},
-  {base:"Dumbbell Row", muscle:"Back", area:"Mid back / lats", keys:["dumbbell row","db row","single arm row","one arm row"], secondary:{Biceps:.5,Traps:.35,Shoulders:.25,Forearms:.15}},
-  {base:"Barbell Row", muscle:"Back", area:"Mid back / lats", keys:["barbell row","pendlay row","bent over row"], secondary:{Biceps:.5,Traps:.4,Shoulders:.25,Forearms:.15}},
-  {base:"Machine Row", muscle:"Back", area:"Mid back / lats", keys:["machine row","chest supported row","t bar row","t-bar row"], secondary:{Biceps:.45,Traps:.35,Shoulders:.25}},
+  {base:"Cable Rows", muscle:"Back", area:"Mid back / lats", keys:["row","rows","cable row","seated row"], secondary:{Biceps:.5,Traps:.35,Shoulders:.25,Forearms:.2}},
+  {base:"High Cable Row", muscle:"Back", area:"Upper back", keys:["high cable row","face away cable row","upper cable row"], secondary:{Biceps:.45,Traps:.45,Shoulders:.35,Forearms:.2}},
+  {base:"Single-arm Cable Row", muscle:"Back", area:"Mid back / lats", keys:["single arm cable row","one arm cable row","single-arm cable row"], secondary:{Biceps:.5,Traps:.35,Shoulders:.25,Forearms:.2}},
+  {base:"Dumbbell Row", muscle:"Back", area:"Mid back / lats", keys:["dumbbell row","db row","single arm row","one arm row"], secondary:{Biceps:.5,Traps:.35,Shoulders:.25,Forearms:.25}},
+  {base:"Barbell Row", muscle:"Back", area:"Mid back / lats", keys:["barbell row","pendlay row","bent over row"], secondary:{Biceps:.5,Traps:.4,Shoulders:.25,Forearms:.25}},
+  {base:"Machine Row", muscle:"Back", area:"Mid back / lats", keys:["machine row","chest supported row","t bar row","t-bar row"], secondary:{Biceps:.45,Traps:.35,Shoulders:.25,Forearms:.15}},
 
-  {base:"Overhead Press", muscle:"Shoulders", area:"Front delts", keys:["overhead press","ohp","shoulder press","military press"], secondary:{Triceps:.4,Chest:.15}},
+  {base:"Overhead Press", muscle:"Shoulders", area:"Front delts", keys:["overhead press","ohp","shoulder press","military press"], secondary:{Triceps:.4,Chest:.15,Traps:.15}},
   {base:"Dumbbell Shoulder Press", muscle:"Shoulders", area:"Front delts", keys:["dumbbell shoulder press","db shoulder press","seated dumbbell press"], secondary:{Triceps:.4}},
   {base:"Arnold Press", muscle:"Shoulders", area:"Front delts", keys:["arnold press"], secondary:{Triceps:.35}},
   {base:"Pike Pushups", muscle:"Shoulders", area:"Front delts", keys:["pike pushup","pike push-up","pike push up"], secondary:{Triceps:.4,Chest:.15,Core:.15}},
-  {base:"Lateral Raises", muscle:"Shoulders", area:"Side delts - lower path", keys:["lateral raise","lateral raises","side raise","side delt"], secondary:{}},
-  {base:"Cable Lateral Raise", muscle:"Shoulders", area:"Side delts - lower path", keys:["cable lateral raise","single arm lateral raise","leaning lateral raise"], secondary:{}},
-  {base:"Behind-the-back Cable Lateral Raise", muscle:"Shoulders", area:"Side delts - lower path", keys:["behind back cable lateral raise","behind-the-back lateral raise"], secondary:{}},
-  {base:"Machine Lateral Raise", muscle:"Shoulders", area:"Side delts - lower path", keys:["machine lateral raise"], secondary:{}},
+  {base:"Lateral Raises", muscle:"Shoulders", area:"Side delts - lower path", keys:["lateral raise","lateral raises","side raise","side delt"], secondary:{Traps:.2}},
+  {base:"Cable Lateral Raise", muscle:"Shoulders", area:"Side delts - lower path", keys:["cable lateral raise","single arm lateral raise","leaning lateral raise"], secondary:{Traps:.15}},
+  {base:"Behind-the-back Cable Lateral Raise", muscle:"Shoulders", area:"Side delts - lower path", keys:["behind back cable lateral raise","behind-the-back lateral raise"], secondary:{Traps:.1}},
+  {base:"Machine Lateral Raise", muscle:"Shoulders", area:"Side delts - lower path", keys:["machine lateral raise"], secondary:{Traps:.15}},
   {base:"Cable Y Raise", muscle:"Shoulders", area:"Side delts - upper path", keys:["cable y raise","y raise","cable y-raise"], secondary:{Traps:.2}},
   {base:"Cable Front Raise", muscle:"Shoulders", area:"Front delts", keys:["cable front raise"], secondary:{Chest:.1}},
   {base:"Cable Rear Delt Fly", muscle:"Shoulders", area:"Rear delts / upper back", keys:["cable rear delt fly","rear delt cable fly","cable reverse fly"], secondary:{Back:.25,Traps:.2}},
@@ -90,7 +96,7 @@ const EXERCISE_TAXONOMY=[
   {base:"Trap Bar Shrugs", muscle:"Traps", area:"Upper traps", keys:["trap bar shrug","hex bar shrug"], secondary:{Forearms:.2}},
   {base:"Cable Shrugs", muscle:"Traps", area:"Upper traps", keys:["cable shrug","cable shrugs"], secondary:{Forearms:.15}},
   {base:"Farmer Carries", muscle:"Traps", area:"Upper traps", keys:["farmer carry","farmers carry","farmer walk","farmers walk"], secondary:{Forearms:.75,Core:.25,Calves:.1}},
-  {base:"Upright Rows", muscle:"Traps", area:"Upper traps", keys:["upright row","upright rows"], secondary:{Shoulders:.55,Biceps:.2}},
+  {base:"Upright Rows", muscle:"Traps", area:"Upper traps", keys:["upright row","upright rows"], secondary:{Shoulders:.55,Biceps:.2,Forearms:.15}},
 
   {base:"Biceps Curls", muscle:"Biceps", area:"Biceps", keys:["bicep curl","biceps curl","curl","curls","bayesian curl","cable curl"], secondary:{Forearms:.2}},
   {base:"Cable Curl", muscle:"Biceps", area:"Biceps", keys:["standing cable curl","single arm cable curl","one arm cable curl"], secondary:{Forearms:.2}},
@@ -109,7 +115,7 @@ const EXERCISE_TAXONOMY=[
   {base:"Single-arm Cable Pushdown", muscle:"Triceps", area:"Lateral / medial head", keys:["single arm pushdown","single-arm pushdown","one arm tricep pushdown"], secondary:{}},
   {base:"Skull Crushers", muscle:"Triceps", area:"Triceps long head", keys:["skull crusher","skullcrusher","lying tricep extension","lying triceps extension"], secondary:{}},
   {base:"Close-grip Bench Press", muscle:"Triceps", area:"Lateral / medial head", keys:["close grip bench","close-grip bench","close grip press"], secondary:{Chest:.35,Shoulders:.25}},
-  {base:"Bench Dips", muscle:"Triceps", area:"Lateral / medial head", keys:["bench dip","bench dips","tricep dip","triceps dip"], secondary:{Chest:.25,Shoulders:.25,Back:.15}},
+  {base:"Bench Dips", muscle:"Triceps", area:"Lateral / medial head", keys:["bench dip","bench dips","tricep dip","triceps dip"], secondary:{Chest:.25,Shoulders:.25}},
   {base:"Triceps Kickback", muscle:"Triceps", area:"Lateral / medial head", keys:["kickback","tricep kickback","triceps kickback"], secondary:{}},
   {base:"Cable Triceps Kickback", muscle:"Triceps", area:"Lateral / medial head", keys:["cable tricep kickback","cable triceps kickback"], secondary:{}},
   {base:"Diamond Pushups", muscle:"Triceps", area:"Lateral / medial head", keys:["diamond pushup","diamond push-up","diamond push up","triangle pushup"], secondary:{Chest:.35,Shoulders:.25,Core:.1}},
@@ -124,7 +130,7 @@ const EXERCISE_TAXONOMY=[
 
   {base:"Squats", muscle:"Quads", area:"Quads / glutes", keys:["squat","squats","back squat","cable squat"], secondary:{Glutes:.5,Hamstrings:.1,Calves:.1}},
   {base:"Front Squat", muscle:"Quads", area:"Quads / glutes", keys:["front squat"], secondary:{Glutes:.35,Core:.25,Calves:.1}},
-  {base:"Leg Press", muscle:"Quads", area:"Quads / glutes", keys:["leg press"], secondary:{Glutes:.45,Hamstrings:.15,Calves:.1}},
+  {base:"Leg Press", muscle:"Quads", area:"Quads / glutes", keys:["leg press"], secondary:{Glutes:.45,Hamstrings:.1,Calves:.1}},
   {base:"Hack Squat", muscle:"Quads", area:"Quads / glutes", keys:["hack squat","pendulum squat"], secondary:{Glutes:.35,Hamstrings:.1,Calves:.1}},
   {base:"Leg Extension", muscle:"Quads", area:"Quads / glutes", keys:["leg extension","quad extension"], secondary:{}},
   {base:"Bulgarian Split Squat", muscle:"Quads", area:"Quads / glutes", keys:["bulgarian split squat","split squat"], secondary:{Glutes:.5,Hamstrings:.2,Core:.15}},
@@ -134,8 +140,8 @@ const EXERCISE_TAXONOMY=[
   {base:"Leg Curls", muscle:"Hamstrings", area:"Hamstrings", keys:["leg curl","leg curls","hamstring curl","ham curls"], secondary:{Glutes:.1}},
   {base:"Seated Leg Curl", muscle:"Hamstrings", area:"Hamstrings", keys:["seated leg curl"], secondary:{Glutes:.1}},
   {base:"Lying Leg Curl", muscle:"Hamstrings", area:"Hamstrings", keys:["lying leg curl","prone leg curl"], secondary:{Glutes:.1}},
-  {base:"Romanian Deadlift", muscle:"Hamstrings", area:"Hamstrings", keys:["romanian deadlift","rdl","deadlift"], secondary:{Glutes:.45,Back:.2,Traps:.1,Forearms:.1}},
-  {base:"Stiff-leg Deadlift", muscle:"Hamstrings", area:"Hamstrings", keys:["stiff leg deadlift","stiff-legged deadlift","sldl"], secondary:{Glutes:.4,Back:.2,Traps:.1,Forearms:.1}},
+  {base:"Romanian Deadlift", muscle:"Hamstrings", area:"Hamstrings", keys:["romanian deadlift","rdl","deadlift"], secondary:{Glutes:.45,Back:.2,Traps:.1,Forearms:.25}},
+  {base:"Stiff-leg Deadlift", muscle:"Hamstrings", area:"Hamstrings", keys:["stiff leg deadlift","stiff-legged deadlift","sldl"], secondary:{Glutes:.4,Back:.2,Traps:.1,Forearms:.25}},
   {base:"Good Morning", muscle:"Hamstrings", area:"Hamstrings", keys:["good morning","good mornings"], secondary:{Glutes:.35,Back:.25}},
   {base:"Nordic Ham Curl", muscle:"Hamstrings", area:"Hamstrings", keys:["nordic curl","nordic ham curl","nordic hamstring"], secondary:{Glutes:.1,Core:.15}},
   {base:"Glute-Ham Raise", muscle:"Hamstrings", area:"Hamstrings", keys:["glute ham raise","ghr"], secondary:{Glutes:.25,Core:.15}},
@@ -162,7 +168,7 @@ const EXERCISE_TAXONOMY=[
   {base:"Cable Woodchop", muscle:"Core", area:"Core", keys:["cable woodchop","woodchop","cable chop"], secondary:{Shoulders:.1}},
   {base:"Crunch", muscle:"Core", area:"Core", keys:["crunch","crunches"], secondary:{}},
   {base:"Sit-up", muscle:"Core", area:"Core", keys:["situp","sit-up","sit up"], secondary:{}},
-  {base:"Hanging Leg Raise", muscle:"Core", area:"Core", keys:["hanging leg raise","leg raise","leg raises","hanging knee raise"], secondary:{Forearms:.15}},
+  {base:"Hanging Leg Raise", muscle:"Core", area:"Core", keys:["hanging leg raise","leg raise","leg raises","hanging knee raise"], secondary:{Forearms:.25}},
   {base:"Ab Wheel Rollout", muscle:"Core", area:"Core", keys:["ab wheel","rollout","ab rollout"], secondary:{Shoulders:.15,Back:.1}},
   {base:"Russian Twist", muscle:"Core", area:"Core", keys:["russian twist","twist"], secondary:{}},
   {base:"Pallof Press", muscle:"Core", area:"Core", keys:["pallof press","anti rotation"], secondary:{Shoulders:.1}},
@@ -222,6 +228,7 @@ function secondaryMuscles(ex){
   const add=(muscle,weight)=>{ if(muscle&&muscle!==m) out[muscle]=(out[muscle]||0)+weight; };
   if(m==='Back'){
     add('Biceps',0.5); add('Traps',name.includes('row')?0.35:0.2);
+    add('Forearms',/chin|pull.?up/.test(name)?0.3:0.2);
     if(area.includes('Upper back')) add('Shoulders',0.25);
   }
   if(m==='Chest'){
