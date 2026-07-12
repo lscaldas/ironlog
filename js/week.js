@@ -54,7 +54,8 @@ document.querySelectorAll('#groupSeg .gchip').forEach(b=>b.onclick=()=>{
   GMODE=b.dataset.g; localStorage.setItem('ironlog.gmode',GMODE); renderWeek();
 });
 
-/* ===== Central muscle bars — one stacked bar per muscle, three tier "lives" ===== */
+/* ===== Central muscle bars — boss-HP style: three equal sub-bars per muscle,
+   one purple family that brightens each phase (maintain → build → beast) ===== */
 const TIER_COLORS=['var(--tier-maintain)','var(--tier-build)','var(--tier-beast)'];
 function renderMuscleBars(mk){
   const rows=muscleEffective(mk);
@@ -65,18 +66,16 @@ function renderMuscleBars(mk){
   });
   document.getElementById('mbalList').innerHTML=data.length?data.map(r=>{
     const st=muscleBarState(r.eff,r.muscle);
-    const baseColor=st.cleared>0?TIER_COLORS[Math.min(st.cleared,TIER_COLORS.length)-1]:'';
-    const fillColor=TIER_COLORS[Math.min(st.cleared,TIER_COLORS.length-1)];
-    const label=st.next===null?`${fmtEff(r.eff)} MAX`:`${fmtEff(r.eff)} / ${st.next}`;
-    const pips=BAR_TIERS.map((t,i)=>`<span class="pip ${i<st.cleared?'on':''}" title="${t.label} at ${st.thresholds[i]} sets">${t.icon}</span>`).join('');
+    const segs=BAR_TIERS.map((t,i)=>{
+      const lo=i===0?0:st.thresholds[i-1], hi=st.thresholds[i];
+      const pct=Math.max(0,Math.min(1,(r.eff-lo)/(hi-lo)))*100;
+      const locked=r.eff<lo-1e-9;
+      const full=pct>=100;
+      return `<span class="mseg${locked?' locked':''}${full?' full':''}" title="${t.label} at ${hi} sets"><i style="width:${pct.toFixed(1)}%;background:${TIER_COLORS[i]}"></i><b class="${full?'in':''}">${hi}</b></span>`;
+    }).join('');
     return `<div class="mrow" title="${r.direct} direct set${r.direct===1?'':'s'} · ${fmtEff(r.eff)} effective this week">
       <div class="mname">${esc(r.muscle)}</div>
-      <div class="mbar">
-        ${baseColor?`<i class="base" style="background:${baseColor}"></i>`:''}
-        <i class="fill" style="width:${st.pct}%;background:${fillColor}"></i>
-        <span class="val">${label}</span>
-      </div>
-      <div class="pips">${pips}</div>
+      <div class="mbar">${segs}<span class="val">${fmtEff(r.eff)}</span></div>
     </div>`;
   }).join(''):`<div class="sub">Add exercises to see weekly muscle bars.</div>`;
 }

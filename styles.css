@@ -2,7 +2,7 @@
     --bg:#0a0a0c; --bg2:#101013; --card:#141418; --card2:#1c1c22;
     --line:#26262e; --txt:#f2f3f5; --muted:#9a9aa8; --dim:#67677a;
     --accent:#a98bff; --accent2:#c9b6ff; --good:#35d399; --blue:#69a7ff; --purp:#b994ff;
-    --tier-maintain:#38d9a9; --tier-build:#f3b64c; --tier-beast:#ff5d73;
+    --tier-maintain:#6b4fd8; --tier-build:#a98bff; --tier-beast:#ddd0ff;
     --on-accent:#160a36; --bad:#f2556a;
     --rad:10px; --shadow:0 14px 36px rgba(0,0,0,.42);
     --cond:'Arial Narrow','Roboto Condensed',ui-sans-serif,system-ui;
@@ -248,7 +248,7 @@
   .week-focus-row button{margin-left:auto;background:none;border:1px solid var(--line);color:var(--muted);border-radius:999px;padding:5px 11px;font-size:11px;font-weight:800;cursor:pointer;}
   .week-focus-row button:active{background:var(--card2);color:var(--txt);}
 
-  /* Muscle bars — stacked tier "lives": maintain, then build loads over it, then beast */
+  /* Muscle bars — boss-HP style: three equal sub-bars, purple brightening per phase */
   .muscle-bars-head{align-items:flex-end;gap:12px;}
   .tier-legend{display:flex;align-items:center;justify-content:flex-end;gap:10px;flex-wrap:wrap;font-size:9.5px;font-weight:800;color:var(--muted);}
   .tier-legend span{display:inline-flex;align-items:center;gap:4px;white-space:nowrap;}
@@ -260,19 +260,21 @@
   .tier-legend .build i{background:var(--tier-build);}
   .tier-legend .beast i{background:var(--tier-beast);}
   .mbal{margin-top:12px;}
-  .mrow{display:grid;grid-template-columns:78px minmax(0,1fr) 52px;gap:9px;align-items:center;margin-bottom:11px;font-size:12.5px;}
+  .mrow{display:grid;grid-template-columns:78px minmax(0,1fr);gap:9px;align-items:center;margin-bottom:11px;font-size:12.5px;}
   .mrow:last-child{margin-bottom:0;}
   .mrow.off{opacity:.42;}
   .mname{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--muted);}
-  .mbar{position:relative;background:var(--bg2);border-radius:8px;height:20px;overflow:hidden;}
-  .mbar .base{position:absolute;inset:0;opacity:.4;}
-  .mbar .fill{position:absolute;top:0;left:0;bottom:0;transition:width .3s;}
+  .mbar{position:relative;display:flex;border-radius:8px;height:22px;overflow:hidden;border:1px solid var(--line);}
+  .mseg{flex:1;position:relative;background:var(--card2);overflow:hidden;min-width:0;}
+  .mseg+.mseg{border-left:2px solid var(--bg);}
+  .mseg.locked{background:#121216;}
+  .mseg i{position:absolute;top:0;left:0;bottom:0;display:block;transition:width .3s;}
+  .mseg b{position:absolute;right:4px;bottom:1px;font-size:8.5px;font-weight:750;color:var(--dim);
+    font-variant-numeric:tabular-nums;line-height:1;z-index:1;}
+  .mseg b.in{color:var(--on-accent);}
   .mbar .val{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
-    font-size:10.5px;font-weight:850;color:var(--txt);text-shadow:0 1px 2px rgba(0,0,0,.65);
-    font-variant-numeric:tabular-nums;letter-spacing:.2px;pointer-events:none;}
-  .pips{display:flex;gap:3px;justify-content:flex-end;align-items:center;}
-  .pip{font-size:11px;line-height:1;filter:grayscale(1);opacity:.25;}
-  .pip.on{filter:none;opacity:1;}
+    font-size:11px;font-weight:850;color:var(--txt);text-shadow:0 1px 2px rgba(0,0,0,.7);
+    font-variant-numeric:tabular-nums;letter-spacing:.2px;pointer-events:none;z-index:2;}
 
   /* Exercise catalog */
   .cat-grid{display:grid;gap:10px;}
@@ -321,9 +323,9 @@
     .muscle-bars-head{align-items:flex-start;}
     .tier-legend{max-width:150px;gap:5px 8px;font-size:8.5px;}
     .mbal{margin-top:9px;}
-    .mrow{grid-template-columns:64px minmax(0,1fr) 44px;gap:6px;margin-bottom:8px;font-size:11.5px;}
-    .mbar{height:18px;}
-    .pip{font-size:9.5px;}
+    .mrow{grid-template-columns:64px minmax(0,1fr);gap:6px;margin-bottom:8px;font-size:11.5px;}
+    .mbar{height:19px;}
+    .mseg b{font-size:8px;}
     .bucket-h{margin-top:11px;}
     .ex{padding:11px;margin-bottom:7px;}
     .exname{font-size:14px;}

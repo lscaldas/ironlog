@@ -291,18 +291,20 @@ test('muscle bars stack tier lives, stay central, and exercises show per-set con
     const root = getComputedStyle(document.documentElement);
     return ['--tier-maintain', '--tier-build', '--tier-beast'].map((name) => root.getPropertyValue(name).trim());
   });
-  expect(tierColors, 'Tier colors should escalate from readiness to effort to maximum intensity.').toEqual([
-    '#38d9a9',
-    '#f3b64c',
-    '#ff5d73',
+  expect(tierColors, 'Tiers share one purple family that brightens each phase.').toEqual([
+    '#6b4fd8',
+    '#a98bff',
+    '#ddd0ff',
   ]);
   const pullups = page.locator('#weekList .ex', { hasText: 'Pullups' });
   await expect(pullups.locator('.contrib', { hasText: /\+1 Back/i }), 'Each exercise must state what one set feeds into the bars.').toBeVisible();
   await expect(pullups.locator('.contrib', { hasText: /Biceps/i })).toBeVisible();
 
   const backRow = page.locator('#mbalList .mrow', { hasText: 'Back' }).first();
-  await expect(backRow.locator('.val'), 'Set values stay centered on the bar.').toHaveText('0 / 4');
-  await expect(backRow.locator('.pip.on')).toHaveCount(0);
+  await expect(backRow.locator('.mseg'), 'Each bar is split into three boss-HP sub-bars.').toHaveCount(3);
+  await expect(backRow.locator('.val'), 'The current value stays centered on the bar.').toHaveText('0');
+  await expect(backRow.locator('.mseg.full')).toHaveCount(0);
+  await expect(backRow.locator('.mseg.locked'), 'Later phases start locked.').toHaveCount(2);
 
   await startWorkout(page);
   for (let i = 0; i < 4; i += 1) {
@@ -312,11 +314,12 @@ test('muscle bars stack tier lives, stay central, and exercises show per-set con
     await expect(pullups.locator('.wkchip')).toHaveCount(i + 1);
   }
 
-  await expect(backRow.locator('.val'), 'Clearing maintain should roll the bar into the next tier.').toHaveText('4 / 8');
-  await expect(backRow.locator('.pip.on'), 'The first tier life should light up once maintained.').toHaveCount(1);
+  await expect(backRow.locator('.val')).toHaveText('4');
+  await expect(backRow.locator('.mseg.full'), 'Clearing maintain should complete the first sub-bar.').toHaveCount(1);
+  await expect(backRow.locator('.mseg.locked'), 'Clearing maintain should unlock the build sub-bar.').toHaveCount(1);
 
   await page.reload();
-  await expect(page.locator('#mbalList .mrow', { hasText: 'Back' }).first().locator('.val')).toHaveText('4 / 8');
+  await expect(page.locator('#mbalList .mrow', { hasText: 'Back' }).first().locator('.val')).toHaveText('4');
 });
 
 test('T-020 visible set removal recalculates statistics after reload', async ({ page }, testInfo) => {
