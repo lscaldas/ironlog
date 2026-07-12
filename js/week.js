@@ -168,11 +168,14 @@ function exCard(e,mk){
   const done=sets.length;
   const sg=suggest(e);
   const node=document.createElement('div'); node.className='ex';
-  // this week's sets, compact
-  const best=bestSet(sets);
-  const chips=sets.map(s=>`<span class="wkchip ${best&&s.id===best.id&&done>1?'best':''}"><b>${s.reps}</b>×${fmtW(s.kg)}<button class="editSet" type="button" data-sid="${esc(s.id)}" aria-label="Edit set ${s.reps} by ${fmtW(s.kg)}">Edit</button><button class="x" type="button" data-sid="${esc(s.id)}" aria-label="Remove set ${s.reps} by ${fmtW(s.kg)}">x</button></span>`).join('');
+  // Keep the card compact: only this week's three latest sets are shown.
+  const recentSets=sets.slice(-3);
+  const best=bestSet(recentSets);
+  const chips=recentSets.map(s=>`<span class="wkchip ${best&&s.id===best.id&&recentSets.length>1?'best':''}"><b>${s.reps}</b>×${fmtW(s.kg)}<button class="editSet" type="button" data-sid="${esc(s.id)}" aria-label="Edit set ${s.reps} by ${fmtW(s.kg)}">Edit</button><button class="x" type="button" data-sid="${esc(s.id)}" aria-label="Remove set ${s.reps} by ${fmtW(s.kg)}">x</button></span>`).join('');
   const contribChips=exerciseContributions(e).map(p=>`<span class="contrib ${p.primary?'primary':''}">+${fmtEff(p.weight)} ${esc(p.muscle)}</span>`).join('');
-  const tip=sg.tip+(e.notes?` · ${esc(e.notes)}`:'');
+  const progressTip=sg.tip.replace(/\s*·\s*last [^·]+$/i,'').replace(/^Last [^·]+·\s*/i,'');
+  const tip=progressTip+(e.notes?` · ${esc(e.notes)}`:'');
+  const inferredMatch=exerciseMatch(e.name);
   const matchNote=inferredExerciseNote(e);
   node.innerHTML=`
     <div class="ex-top">
@@ -183,12 +186,22 @@ function exCard(e,mk){
         <div class="exsub">${tip}</div>
         ${matchNote?`<div class="match-note">${matchNote}</div>`:''}
       </div>
+      ${inferredMatch&&inferredMatch.confidence!=='exact'?`<button class="correctEx" type="button" title="Correct exercise name" aria-label="Use ${esc(inferredMatch.base)} as exercise name">✓</button>`:''}
       <button class="editEx" title="Edit">⚙︎</button>
       <button class="log-plus" title="Log set">＋</button>
     </div>
     ${chips?`<div class="wkchips">${chips}</div>`:''}`;
   node.querySelector('.log-plus').onclick=()=>openLog(e);
   node.querySelector('.editEx').onclick=()=>openEx(e);
+  const correctBtn=node.querySelector('.correctEx');
+  if(correctBtn) correctBtn.onclick=()=>{
+    const match=exerciseMatch(e.name);
+    if(!match||match.confidence==='exact') return;
+    e.name=match.base;
+    save();
+    renderWeek();
+    toast("Exercise name corrected ✓");
+  };
   node.querySelectorAll('.editSet').forEach(btn=>btn.onclick=()=>{ const s=DB.sets.find(x=>x.id===btn.dataset.sid); if(s) openSetEdit(s); });
   node.querySelectorAll('.x').forEach(x=>x.onclick=()=>removeLoggedSet(x.dataset.sid));
   return node;

@@ -97,8 +97,9 @@
   .sugg.up .m b{color:var(--good);}
 
   /* Compact card actions */
-  .editEx{background:none;border:none;color:var(--dim);font-size:15px;cursor:pointer;padding:6px;flex-shrink:0;border-radius:8px;}
-  .editEx:active{background:var(--card2);}
+  .editEx,.correctEx{background:none;border:none;color:var(--dim);font-size:15px;cursor:pointer;padding:6px;flex-shrink:0;border-radius:8px;}
+  .correctEx{color:var(--good);font-size:17px;font-weight:850;}
+  .editEx:active,.correctEx:active{background:var(--card2);}
   .log-plus{flex-shrink:0;width:44px;height:44px;border-radius:12px;border:none;cursor:pointer;
     background:linear-gradient(135deg,var(--accent),var(--accent2));color:var(--on-accent);font-size:22px;font-weight:700;
     display:grid;place-items:center;box-shadow:0 4px 12px rgba(169,139,255,.32);transition:transform .1s;}

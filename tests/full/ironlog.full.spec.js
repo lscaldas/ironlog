@@ -311,7 +311,7 @@ test('muscle bars stack tier lives, stay central, and exercises show per-set con
     await pullups.locator('button[title="Log set"]').click();
     await fillSet(page, String(8 + i), '0');
     await page.getByRole('button', { name: /Log this set/i }).click();
-    await expect(pullups.locator('.wkchip')).toHaveCount(i + 1);
+    await expect(pullups.locator('.wkchip')).toHaveCount(Math.min(i + 1, 3));
   }
 
   await expect(backRow.locator('.val')).toHaveText('4');
@@ -431,7 +431,8 @@ test('exercise cards can adopt an inferred name and show only the three latest s
   const customName = `My Cable Rows ${Date.now()}`;
   await openLocalProfile(page, name);
 
-  await page.locator('button[title="Edit"]').first().click();
+  const originalCard = page.locator('.ex').filter({ has: page.locator('.exname', { hasText: /^Cable Rows$/ }) });
+  await originalCard.locator('button[title="Edit"]').click();
   await page.locator('#fName').fill(customName);
   await page.getByRole('button', { name: /Save exercise/i }).click();
 
