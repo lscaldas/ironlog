@@ -428,7 +428,7 @@ test('exercise editing and deletion are persisted without erasing logged history
 
 test('exercise cards can adopt an inferred name and show only the three latest sets', async ({ page }, testInfo) => {
   const name = profileName(testInfo);
-  const customName = `My Cable Rows ${Date.now()}`;
+  const customName = `My Incline Bench Press ${Date.now()}`;
   await openLocalProfile(page, name);
 
   const originalCard = page.locator('.ex').filter({ has: page.locator('.exname', { hasText: /^Cable Rows$/ }) });
@@ -437,13 +437,13 @@ test('exercise cards can adopt an inferred name and show only the three latest s
   await page.getByRole('button', { name: /Save exercise/i }).click();
 
   let card = page.locator('.ex', { hasText: customName });
-  await expect(card.locator('.match-note')).toContainText(/Counting as Cable Rows/i);
-  const correctName = card.getByRole('button', { name: /Use Cable Rows as exercise name/i });
+  await expect(card.locator('.match-note')).toContainText(/Counting as Incline Bench Press/i);
+  const correctName = card.getByRole('button', { name: /Use Incline Bench Press as exercise name/i });
   await expect(correctName).toBeVisible();
   await correctName.click();
 
-  card = page.locator('.ex', { has: page.locator('.exname', { hasText: /^Cable Rows$/ }) });
-  await expect(card.locator('.exname')).toHaveText('Cable Rows');
+  card = page.locator('.ex', { has: page.locator('.exname', { hasText: /^Incline Bench Press$/ }) });
+  await expect(card.locator('.exname')).toHaveText('Incline Bench Press');
   await expect(card.locator('.match-note')).toHaveCount(0);
   await expect(card.getByRole('button', { name: /Use .* as exercise name/i })).toHaveCount(0);
 
