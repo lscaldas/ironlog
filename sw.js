@@ -1,18 +1,18 @@
-const CACHE_NAME = 'ironlog-static-v28';
+const CACHE_NAME = 'ironlog-static-v29';
 const APP_SHELL = [
   './',
   './index.html',
-  './styles.css?v=28',
-  './cloud-config.js?v=28',
-  './js/storage.js?v=28',
-  './js/catalog-data.js?v=28',
-  './js/helpers.js?v=28',
-  './js/week.js?v=28',
-  './js/exercises.js?v=28',
-  './js/stats.js?v=28',
-  './js/data.js?v=28',
-  './js/cloud.js?v=28',
-  './js/init.js?v=28',
+  './styles.css?v=29',
+  './cloud-config.js?v=29',
+  './js/storage.js?v=29',
+  './js/catalog-data.js?v=29',
+  './js/helpers.js?v=29',
+  './js/week.js?v=29',
+  './js/exercises.js?v=29',
+  './js/stats.js?v=29',
+  './js/data.js?v=29',
+  './js/cloud.js?v=29',
+  './js/init.js?v=29',
   './manifest.webmanifest',
   './icons/icon.svg'
 ];

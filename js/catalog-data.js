@@ -21,14 +21,14 @@ const SEED=[
 
 /* ================= Muscle taxonomy ================= */
 const MUSCLES=["Chest","Back","Shoulders","Traps","Biceps","Triceps","Forearms","Quads","Hamstrings","Glutes","Calves","Core"];
-const AREAS=["Upper chest","Mid chest","Lower chest / triceps","Chest isolation","Lats","Mid back / lats","Upper back","Rear delts / upper back","Front delts","Side delts - lower path","Side delts - upper path","Upper traps","Biceps","Forearms","Triceps long head","Lateral / medial head","Quads / glutes","Hamstrings","Calves","Core"];
+const AREAS=["Upper chest","Mid chest","Lower chest / triceps","Chest isolation","Lats","Mid back / lats","Upper back","Rear delts / upper back","Front delts","Side delts - lower path","Side delts - upper path","Side delts - full range","Upper traps","Biceps","Forearms","Triceps long head","Lateral / medial head","Quads / glutes","Hamstrings","Calves","Core"];
 const MUSCLE_REGION={Chest:"Upper",Back:"Upper",Shoulders:"Upper",Traps:"Upper",Biceps:"Upper",Triceps:"Upper",Forearms:"Upper",
   Quads:"Lower",Hamstrings:"Lower",Glutes:"Lower",Calves:"Lower",Core:"Core"};
 const MUSCLE_PPL={Chest:"Push",Shoulders:"Push",Triceps:"Push",Back:"Pull",Biceps:"Pull",Traps:"Pull",Forearms:"Pull",
   Quads:"Legs",Hamstrings:"Legs",Glutes:"Legs",Calves:"Legs",Core:"Core"};
 const AREA_PPL={"Rear delts / upper back":"Pull","Upper back":"Pull","Lats":"Pull","Mid back / lats":"Pull","Upper traps":"Pull",
   "Lower chest / triceps":"Push","Upper chest":"Push","Mid chest":"Push","Chest isolation":"Push","Front delts":"Push",
-  "Side delts - lower path":"Push","Side delts - upper path":"Push","Triceps long head":"Push","Lateral / medial head":"Push",
+  "Side delts - lower path":"Push","Side delts - upper path":"Push","Side delts - full range":"Push","Triceps long head":"Push","Lateral / medial head":"Push",
   "Biceps":"Pull","Forearms":"Pull","Quads / glutes":"Legs","Hamstrings":"Legs","Calves":"Legs","Core":"Core"};
 const NAME_MUSCLE={"Rows":"Back","Cable Rows":"Back","Pullups":"Back","Lat Pulldown":"Back","Pushups":"Chest","Bench Press":"Chest","Cable Flys":"Chest","Ring Dips":"Chest",
   "Shoulder Press":"Shoulders","Overhead Press":"Shoulders","Face Pulls":"Shoulders","Single-arm Face Pulls":"Shoulders","Lateral Raises":"Shoulders","Cable Lateral Raise - Lower Path":"Shoulders",
@@ -60,8 +60,12 @@ const EXERCISE_TAXONOMY=[
   {base:"Ring Dips", muscle:"Chest", area:"Lower chest / triceps", keys:["ring dip","rings dip","chest dip","weighted dip"], secondary:{Triceps:.65,Shoulders:.25}},
   {base:"Parallel Bar Dips", muscle:"Chest", area:"Lower chest / triceps", keys:["parallel bar dip","bar dip","parallel dips"], secondary:{Triceps:.65,Shoulders:.35}},
   {base:"Assisted Dips", muscle:"Chest", area:"Lower chest / triceps", keys:["assisted dip","assisted dips","machine dip"], secondary:{Triceps:.65,Shoulders:.35}},
-  {base:"Incline Pushups", muscle:"Chest", area:"Mid chest", keys:["incline pushup","incline push-up","incline push up"], secondary:{Shoulders:.35,Triceps:.35,Core:.1}},
+  {base:"Incline Pushups", muscle:"Chest", area:"Lower chest / triceps", keys:["incline pushup","incline push-up","incline push up"], secondary:{Shoulders:.25,Triceps:.35,Core:.1}},
   {base:"Decline Pushups", muscle:"Chest", area:"Upper chest", keys:["decline pushup","decline push-up","decline push up"], secondary:{Shoulders:.45,Triceps:.35,Core:.1}},
+  /* Lengthened partials: bottom half keeps chest/delts at long length; the
+     triceps' lockout work never happens, so their share drops sharply. */
+  {base:"Bottom-half Pushups", muscle:"Chest", area:"Mid chest", keys:["bottom half pushup","pushup bottom","pushups bottom","prison pushup","lengthened partial pushup","partial pushup"], secondary:{Shoulders:.35,Triceps:.2,Core:.1}},
+  {base:"Bottom-half Decline Pushups", muscle:"Chest", area:"Upper chest", keys:["decline pushup bottom","decline pushups bottom","bottom half decline pushup","decline prison pushup"], secondary:{Shoulders:.45,Triceps:.2,Core:.1}},
 
   {base:"Pullups", muscle:"Back", area:"Lats", keys:["pullup","pull-up","pull up"], secondary:{Biceps:.5,Traps:.2,Forearms:.3}},
   {base:"Chin-ups", muscle:"Back", area:"Lats", keys:["chinup","chin-up","chin up"], secondary:{Biceps:.65,Traps:.2,Forearms:.3}},
@@ -83,7 +87,12 @@ const EXERCISE_TAXONOMY=[
   {base:"Cable Lateral Raise", muscle:"Shoulders", area:"Side delts - lower path", keys:["cable lateral raise","single arm lateral raise","leaning lateral raise"], secondary:{Traps:.15}},
   {base:"Behind-the-back Cable Lateral Raise", muscle:"Shoulders", area:"Side delts - lower path", keys:["behind back cable lateral raise","behind-the-back lateral raise"], secondary:{Traps:.1}},
   {base:"Machine Lateral Raise", muscle:"Shoulders", area:"Side delts - lower path", keys:["machine lateral raise"], secondary:{Traps:.15}},
-  {base:"Cable Y Raise", muscle:"Shoulders", area:"Side delts - upper path", keys:["cable y raise","y raise","cable y-raise"], secondary:{Traps:.2}},
+  /* ROM variants: upper-trap share grows with elevation angle (scapular
+     upward rotation), so partials above/below shoulder height split differently. */
+  {base:"Lateral Raise - Lower Path", muscle:"Shoulders", area:"Side delts - lower path", keys:["lateral raise lower path","lower path lateral raise","lateral raise lower","bottom half lateral raise","partial lateral raise","lateral raise to shoulder"], secondary:{Traps:.1}},
+  {base:"Lateral Raise - Upper Path", muscle:"Shoulders", area:"Side delts - upper path", keys:["lateral raise upper path","upper path lateral raise","lateral raise upper","top half lateral raise","lateral raise top"], secondary:{Traps:.4}},
+  {base:"Lateral Raise - Full Range", muscle:"Shoulders", area:"Side delts - full range", keys:["full range lateral raise","full rom lateral raise","lateral raise full","overhead lateral raise","full lateral raise","lateral raise overhead"], secondary:{Traps:.35}},
+  {base:"Cable Y Raise", muscle:"Shoulders", area:"Side delts - upper path", keys:["cable y raise","y raise","cable y-raise"], secondary:{Traps:.3}},
   {base:"Cable Front Raise", muscle:"Shoulders", area:"Front delts", keys:["cable front raise"], secondary:{Chest:.1}},
   {base:"Cable Rear Delt Fly", muscle:"Shoulders", area:"Rear delts / upper back", keys:["cable rear delt fly","rear delt cable fly","cable reverse fly"], secondary:{Back:.25,Traps:.2}},
   {base:"Rear Delt Fly", muscle:"Shoulders", area:"Rear delts / upper back", keys:["rear delt fly","reverse fly","reverse pec deck"], secondary:{Back:.25,Traps:.2}},

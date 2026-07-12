@@ -123,6 +123,6 @@ if(AUTH_SESSION) hideProfileGate(); else showProfileGate();
 
 if('serviceWorker' in navigator){
   window.addEventListener('load',()=>{
-    navigator.serviceWorker.register('./sw.js?v=28').then(reg=>reg.update()).catch(()=>{});
+    navigator.serviceWorker.register('./sw.js?v=29').then(reg=>reg.update()).catch(()=>{});
   });
 }
