@@ -426,6 +426,40 @@ test('exercise editing and deletion are persisted without erasing logged history
   await expect(page.locator('#weekList .exname', { hasText: editedName })).toHaveCount(0);
 });
 
+test('exercise cards can adopt an inferred name and show only the three latest sets', async ({ page }, testInfo) => {
+  const name = profileName(testInfo);
+  const customName = `My Cable Rows ${Date.now()}`;
+  await openLocalProfile(page, name);
+
+  await page.locator('button[title="Edit"]').first().click();
+  await page.locator('#fName').fill(customName);
+  await page.getByRole('button', { name: /Save exercise/i }).click();
+
+  let card = page.locator('.ex', { hasText: customName });
+  await expect(card.locator('.match-note')).toContainText(/Counting as Cable Rows/i);
+  const correctName = card.getByRole('button', { name: /Use Cable Rows as exercise name/i });
+  await expect(correctName).toBeVisible();
+  await correctName.click();
+
+  card = page.locator('.ex', { has: page.locator('.exname', { hasText: /^Cable Rows$/ }) });
+  await expect(card.locator('.exname')).toHaveText('Cable Rows');
+  await expect(card.locator('.match-note')).toHaveCount(0);
+  await expect(card.getByRole('button', { name: /Use .* as exercise name/i })).toHaveCount(0);
+
+  await startWorkout(page);
+  for (let reps = 8; reps <= 11; reps += 1) {
+    await card.locator('button[title="Log set"]').click();
+    await fillSet(page, String(reps), '20');
+    await page.getByRole('button', { name: /Log this set/i }).click();
+  }
+
+  await expect(card.locator('.wkchip')).toHaveCount(3);
+  await expect(card.locator('.wkchips')).not.toContainText('8×20kg');
+  await expect(card.locator('.wkchips')).toContainText('9×20kg');
+  await expect(card.locator('.wkchips')).toContainText('11×20kg');
+  await expect(card.locator('.exsub')).not.toContainText(/Last 11×20kg/i);
+});
+
 test('local profile logout keeps profiles isolated and data recoverable', async ({ page }, testInfo) => {
   const profileA = profileName(testInfo, '_a');
   const profileB = profileName(testInfo, '_b');
