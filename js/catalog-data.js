@@ -204,6 +204,7 @@ function exerciseMatch(name){
   const tax=taxonomyMatch(raw);
   const exact=NAME_MUSCLE[raw]&&{base:raw,muscle:NAME_MUSCLE[raw],area:NAME_AREA[raw]||NAME_MUSCLE[raw],secondary:{...(tax?.secondary||{})},confidence:'exact',matchedBase:tax?.base||raw,keys:tax?.keys||[]};
   if(exact) return exact;
+  if(tax&&normName(raw)===normName(tax.base)) return {...tax,confidence:'exact'};
   return tax;
 }
 function guessMuscle(name){ return exerciseMatch(name)?.muscle||''; }
