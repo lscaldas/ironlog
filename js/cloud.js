@@ -144,7 +144,7 @@ async function loadCloudProfile(opts={}){
     catch(_){ toast('Could not back up local data. Export it before loading cloud.'); updateCloudUI(); return false; }
     const localSetCount=DB.sets.length;
     DB=mergeProfileData(DB,remote);
-    CLOUD.pin=pin; CLOUD.unlocked=true;
+    CLOUD.pin=pin; CLOUD.unlocked=true; CLOUD.syncError=false;
     normalizeDB();
     save();
     refreshAll();
@@ -165,6 +165,7 @@ async function saveCloudProfile(manual=false){
   if(!cloudReady()){ if(manual) toast("Cloud not configured"); updateCloudUI(); return; }
   if(!pin){ if(manual) toast("Enter profile PIN"); return; }
   if(CLOUD.saving){ CLOUD.pending=true; return false; }
+  clearTimeout(CLOUD.timer); CLOUD.timer=null;
   CLOUD.saving=true;
   setCloudState("Saving...");
   try{
@@ -192,6 +193,7 @@ async function saveCloudProfile(manual=false){
     if(manual) toast("Cloud merged and saved");
     return true;
   }catch(err){
+    if(ACTIVE_PROFILE!==profile) return false;
     CLOUD.syncError=true;
     if(manual) toast("Cloud save failed");
     else queueCloudSave(30000);
@@ -233,7 +235,7 @@ async function changeCloudPin(){
       body:JSON.stringify([{profile_id:profile,data}])
     });
     if(ACTIVE_PROFILE!==profile) return;
-    CLOUD.pin=newPin; CLOUD.unlocked=true; CLOUD.lastSaved=new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
+    CLOUD.pin=newPin; CLOUD.unlocked=true; CLOUD.syncError=false; CLOUD.lastSaved=new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
     if(JSON.stringify(dbForNewPin)!==JSON.stringify(DB)){
       DB=dbForNewPin;
       normalizeDB();
@@ -255,13 +257,26 @@ async function changeCloudPin(){
 function queueCloudSave(delay=900){
   if(!CLOUD.unlocked||!cloudReady()) return;
   clearTimeout(CLOUD.timer);
-  CLOUD.timer=setTimeout(()=>saveCloudProfile(false),delay);
+  CLOUD.timer=setTimeout(()=>{ CLOUD.timer=null; saveCloudProfile(false); },delay);
+  updateCloudUI();
 }
 function setCloudState(text){ document.getElementById('cloudState').textContent=text; }
+function profileSyncStatus(){
+  if(!CLOUD.unlocked||!cloudReady()) return {mode:'local',label:'Local'};
+  if(!navigator.onLine) return {mode:'offline',label:'Offline'};
+  if(CLOUD.syncError) return {mode:'error',label:'Sync issue'};
+  if(CLOUD.saving||CLOUD.pending||CLOUD.timer) return {mode:'syncing',label:'Syncing'};
+  return {mode:'live',label:'Live'};
+}
 function updateCloudUI(){
   document.getElementById('profileInput').value=ACTIVE_PROFILE;
   document.getElementById('gateProfile').value=ACTIVE_PROFILE;
   document.getElementById('activeProfileName').textContent=ACTIVE_PROFILE;
+  const status=profileSyncStatus();
+  const pill=document.getElementById('profilePill');
+  pill.dataset.mode=status.mode;
+  pill.setAttribute('aria-label',`${ACTIVE_PROFILE} · ${status.label}`);
+  document.getElementById('profileSyncMode').textContent=status.label;
   if(!cloudConfig().enabled){
     setCloudState("Local only");
     document.getElementById('cloudHelp').textContent="Cloud sync needs Supabase URL/key in cloud-config.js.";
@@ -270,6 +285,11 @@ function updateCloudUI(){
   document.getElementById('cloudHelp').textContent=CLOUD.unlocked
     ? "Unlocked. Changes merge and auto-save encrypted to cloud."
     : "Enter this profile's PIN, then merge cloud data or save.";
+  if(CLOUD.unlocked&&!navigator.onLine){
+    setCloudState("Offline — waiting to sync");
+    document.getElementById('cloudHelp').textContent="Changes stay on this device until the connection returns.";
+    return;
+  }
   if(CLOUD.unlocked&&CLOUD.syncError){
     setCloudState("Sync failed — retrying");
     document.getElementById('cloudHelp').textContent="Last save didn't reach the cloud. Retrying automatically; changes are safe locally.";
@@ -297,11 +317,13 @@ function hideProfileGate(){
   syncGateLock();
   requestAnimationFrame(showRecoveryIfNeeded);
 }
+window.addEventListener('online',updateCloudUI);
+window.addEventListener('offline',updateCloudUI);
 function logout(){
   saveWorkoutOnLeave();
   clearSession();
   clearTimeout(CLOUD.timer); CLOUD.pending=false;
-  CLOUD.pin=''; CLOUD.unlocked=false; CLOUD.lastSaved='';
+  CLOUD.pin=''; CLOUD.unlocked=false; CLOUD.lastSaved=''; CLOUD.syncError=false;
   document.getElementById('cloudPin').value='';
   closeSheets();
   updateCloudUI();
@@ -316,7 +338,7 @@ function switchProfile(profile,opts={}){
   clearTimeout(CLOUD.timer); CLOUD.pending=false;
   ACTIVE_PROFILE=next;
   localStorage.setItem(PROFILE_KEY,ACTIVE_PROFILE);
-  CLOUD.pin=''; CLOUD.unlocked=false; CLOUD.lastSaved='';
+  CLOUD.pin=''; CLOUD.unlocked=false; CLOUD.lastSaved=''; CLOUD.syncError=false;
   document.getElementById('cloudPin').value='';
   DB=load();
   normalizeDB();

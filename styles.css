@@ -29,8 +29,13 @@
   .head-actions{display:flex;align-items:center;gap:8px;}
   .profile-pill{max-width:118px;height:40px;display:flex;align-items:center;gap:7px;background:rgba(28,38,53,.82);border:1px solid var(--line);
     color:var(--txt);border-radius:999px;padding:0 11px;font-size:12px;font-weight:750;cursor:pointer;}
-  .profile-pill span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .profile-pill .profile-copy{display:flex;flex-direction:column;align-items:flex-start;min-width:0;line-height:1.05;}
+  .profile-pill .profile-copy span{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .profile-pill .profile-copy small{font-size:9px;font-weight:750;color:var(--muted);white-space:nowrap;}
   .profile-pill i{width:8px;height:8px;border-radius:50%;background:var(--good);box-shadow:0 0 0 3px rgba(53,211,153,.12);flex-shrink:0;}
+  .profile-pill[data-mode="local"] i,.profile-pill[data-mode="offline"] i{background:var(--muted);box-shadow:0 0 0 3px rgba(154,154,168,.12);}
+  .profile-pill[data-mode="syncing"] i{background:var(--blue);box-shadow:0 0 0 3px rgba(105,167,255,.12);}
+  .profile-pill[data-mode="error"] i{background:var(--bad);box-shadow:0 0 0 3px rgba(242,85,106,.12);}
   .icon-btn{background:var(--card);border:1px solid var(--line);color:var(--muted);
     width:40px;height:40px;border-radius:12px;font-size:17px;cursor:pointer;}
 

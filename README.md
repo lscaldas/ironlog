@@ -74,7 +74,7 @@ window.IRONLOG_CLOUD = {
 
 7. Commit and push the update.
 
-In the app, enter a profile name and PIN on the first screen. If the encrypted cloud profile already exists, it merges with local workouts by record ID. If it does not exist, the app creates it from the current local program. Before a cloud merge, the app keeps up to five local copies under **Data & backup → Saved local copies**. After a profile is unlocked, changes merge and auto-save encrypted to cloud. Copies live only in this browser; export JSON separately for a backup that survives device loss.
+In the app, enter a profile name and PIN on the first screen. If the encrypted cloud profile already exists, it merges with local workouts by record ID. If it does not exist, the app creates it from the current local program. Before a cloud merge, the app keeps up to five local copies under **Data & backup → Saved local copies**. After a profile is unlocked, changes merge and auto-save encrypted to cloud. The profile button shows whether changes are Local, Syncing, Live, Offline, or have a Sync issue. A reload requires the PIN again before cloud syncing resumes. Copies live only in this browser; export JSON separately for a backup that survives device loss.
 
 ### GitHub Pages
 
