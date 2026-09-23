@@ -6,6 +6,7 @@ node_modules/
 playwright-report/
 playwright-results/
 test-results/
+.firebase/
 .claude/
 .zip
 .gstack/

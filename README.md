@@ -50,7 +50,9 @@ Public app files:
 
 Do not publish the spreadsheet or `.transcription_crops/`; they are source artifacts, not app files.
 
-The Firebase project and Hosting site are `ironlog-43233`, and Firestore uses the Berlin region. Google is the enabled sign-in provider. Firestore rules allow each authenticated user to access only their own `users/{uid}/ironlog/*` documents. The web configuration contains public identifiers, not a server secret.
+The Firebase project and Hosting site are `ironlog-43233`; use `https://ironlog-43233.firebaseapp.com` for sign-in. Firestore uses the Berlin region. Google is the enabled sign-in provider. Firestore rules allow each authenticated user to access only their own `users/{uid}/ironlog/*` documents. The web configuration contains public identifiers, not a server secret.
+
+The site's `web.app` alias redirects new visitors to `firebaseapp.com`. If someone saved local data on the alias, it stays available there for JSON export before they move to the canonical address.
 
 Deploy from this branch with `firebase deploy --only firestore:rules,hosting --project ironlog-43233`. Keep the existing GitHub Pages release on `main` available while people export their data.
 

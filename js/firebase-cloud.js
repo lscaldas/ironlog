@@ -78,6 +78,12 @@ function initFirebaseSync(){
   return CLOUD.initPromise;
 }
 async function signInWithGoogle(){
+  if(location.hostname==='ironlog-43233.web.app'){
+    const message='Export JSON from this address, then open ironlog-43233.firebaseapp.com and import it there.';
+    document.getElementById('gateMsg').textContent=message;
+    toast(message);
+    return false;
+  }
   CLOUD.preferLocal=false;
   document.getElementById('gateMsg').textContent='Connecting to Google...';
   if(!document.getElementById('profileGate').classList.contains('hide')){

@@ -1,4 +1,16 @@
 {
+  "auth": {
+    "providers": {
+      "googleSignIn": {
+        "oAuthBrandDisplayName": "IronLog",
+        "supportEmail": "lsouzacaldas@gmail.com",
+        "authorizedRedirectUris": [
+          "https://ironlog-43233.firebaseapp.com/__/auth/handler",
+          "https://ironlog-43233.web.app/__/auth/handler"
+        ]
+      }
+    }
+  },
   "firestore": {
     "rules": "firestore.rules"
   },
