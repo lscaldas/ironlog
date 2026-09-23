@@ -1,6 +1,6 @@
 # IronLog
 
-IronLog is a static, single-page workout tracker. It can be hosted on GitHub Pages, Netlify, or Cloudflare Pages with no build step.
+IronLog is a static, single-page workout tracker hosted on Firebase Hosting. It saves locally first and can sync with Google sign-in through Cloud Firestore.
 
 Product plans (accounts, billing, sync rework, build tooling) are tracked in [docs/ROADMAP.md](docs/ROADMAP.md).
 
@@ -26,78 +26,41 @@ The weekly selection is stored by Monday date, survives reload/export/cloud sync
 
 ## Data model
 
-Workout data is private to each browser/device and is stored in `localStorage` under `ironlog.v2`.
+Local profiles are stored in browser `localStorage` under `ironlog.v2.<profile>`. Signed-in data is also cached on the device under a Google-account-specific key and synced to the matching Firebase account.
 
 - Adding exercises, sections, and sets does not rewrite `index.html`.
-- Each person who opens the hosted URL has their own separate data.
+- Each Google account has separate cloud data. The profile button shows Local, Syncing, Live, Offline, or Sync issue.
 - Use **Data & backup -> Export data (JSON)** to back up or move data.
-- Use **Import data (JSON)** to restore a backup on another device or after clearing browser data.
+- Use **Import data (JSON) · merge** after signing in to add an old backup to the chosen Google account. Matching record IDs are merged; this does not replace newer workouts.
 
-## Deploy Options
+## Firebase deployment
 
 Public app files:
 
 - `index.html`
 - `styles.css`
 - `js/` (app scripts, loaded in order — plain scripts sharing global scope, no build step)
-- `cloud-config.js`
+- `firebase-config.js`
 - `manifest.webmanifest`
 - `sw.js`
 - `.nojekyll`
 - `icons/icon.svg`
-- `supabase.sql`
+- `firebase.json` and `firestore.rules` for deployment
 
 Do not publish the spreadsheet or `.transcription_crops/`; they are source artifacts, not app files.
 
-## Optional Cloud Sync
+The Firebase project and Hosting site are `ironlog-43233`, and Firestore uses the Berlin region. Google is the enabled sign-in provider. Firestore rules allow each authenticated user to access only their own `users/{uid}/ironlog/*` documents. The web configuration contains public identifiers, not a server secret.
 
-Cloud sync uses Supabase as a tiny encrypted backup store. The app still works offline and saves locally first.
+Deploy from this branch with `firebase deploy --only firestore:rules,hosting --project ironlog-43233`. Keep the existing GitHub Pages release on `main` available while people export their data.
 
-Each profile uses a profile name and PIN. New profile names are created on first cloud save. The PIN is not sent to Supabase; it derives an AES-GCM encryption key in the browser. Supabase stores only encrypted JSON blobs.
+### Moving from the old app
 
-This is casual privacy, not full account security. Anyone with the public app configuration could overwrite encrypted blobs if they know the profile IDs. They still cannot read the workout data without the PIN.
+1. Open the existing GitHub Pages app on a device where your workouts are visible and use **Data & backup → Export data (JSON)**.
+2. Open the Firebase-hosted app, sign in with the Google account you want to use, and choose **Import data (JSON) · merge**.
+3. Wait until the profile button says **Live**, then verify History and Progress. Keep the JSON file as an independent backup.
 
-### Supabase Setup
-
-1. Create a free Supabase project.
-2. Open **SQL Editor**.
-3. Run the SQL in `supabase.sql`.
-4. Open **Project Settings -> API**.
-5. Copy the project URL and anon public/publishable key.
-6. Put them into `cloud-config.js`:
-
-```js
-window.IRONLOG_CLOUD = {
-  supabaseUrl: "https://YOUR_PROJECT.supabase.co",
-  supabaseAnonKey: "YOUR_ANON_OR_PUBLISHABLE_PUBLIC_KEY"
-};
-```
-
-7. Commit and push the update.
-
-In the app, enter a profile name and PIN on the first screen. If the encrypted cloud profile already exists, it merges with local workouts by record ID. If it does not exist, the app creates it from the current local program. Before a cloud merge, the app keeps up to five local copies under **Data & backup → Saved local copies**. After a profile is unlocked, changes merge and auto-save encrypted to cloud. The profile button shows whether changes are Local, Syncing, Live, Offline, or have a Sync issue. A reload requires the PIN again before cloud syncing resumes. Copies live only in this browser; export JSON separately for a backup that survives device loss.
-
-### GitHub Pages
-
-1. Create a GitHub repository.
-2. Upload the public app files above to the repository root, or push this folder with Git after `.gitignore` is in place.
-3. In GitHub, open **Settings -> Pages**.
-4. Set **Source** to deploy from the main branch root.
-5. Share the Pages URL.
-
-### Netlify
-
-1. Drag this folder into Netlify Drop, or connect the GitHub repository.
-2. Use no build command.
-3. Use `/` as the publish directory if Netlify asks.
-
-### Cloudflare Pages
-
-1. Connect the GitHub repository.
-2. Set framework preset to **None**.
-3. Leave build command empty.
-4. Use `/` as the output directory.
+The Google account can have a different name or email from the old local profile. JSON import merges by record ID. A backup contains only workouts visible to the old app when exported. Old Supabase cloud data cannot be decrypted without its original PIN, and an old browser/device with no remaining data cannot be recovered by this migration.
 
 ## Updating
 
-Edit the files, push or upload the new version, then reload the hosted app. The service worker is network-first for page loads, so online visits should pick up updates while still keeping an offline fallback.
+Edit the files, deploy with the Firebase CLI, then reload the hosted app. The service worker is network-first for page loads, so online visits should pick up updates while still keeping an offline fallback.

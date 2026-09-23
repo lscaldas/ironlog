@@ -190,7 +190,7 @@ test('SMK-01 new user setup, refresh auth, locked focus, and start lifecycle', a
     expect.soft(
       focusedText,
       `AC-B005-1 / AC-B005-2: Tab step ${index + 1} should stay inside the lock/open-profile controls`,
-    ).toMatch(/profile|pin|open profile|use local only|e\.g\. lucas|your profile pin/i);
+    ).toMatch(/profile|continue with google|use local only|e\.g\. lucas/i);
   }
 
   await openLocalProfile(page, name);

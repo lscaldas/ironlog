@@ -519,7 +519,7 @@ test('invalid structured import is rejected and preserves current visible data',
 
 test('locked screen traps reverse tab, Escape, Enter, and pointer attempts inside the gate', async ({ page }) => {
   await expect(page.getByRole('heading', { name: gateHeading })).toBeVisible();
-  await expect(page.locator('#gateProfile')).toBeFocused();
+  await expect(page.locator('#gateGoogleBtn')).toBeFocused();
 
   for (const key of ['Shift+Tab', 'Shift+Tab', 'Tab', 'Escape', 'Enter']) {
     await page.keyboard.press(key);

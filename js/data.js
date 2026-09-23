@@ -207,7 +207,19 @@ document.getElementById('removeSampleBtn').onclick=()=>{
 document.getElementById('exportBtn').onclick=()=>{ const b=new Blob([JSON.stringify(DB,null,2)],{type:'application/json'}); const a=document.createElement('a'); a.href=URL.createObjectURL(b); a.download='ironlog-'+todayKey()+'.json'; a.click(); toast("Exported ✓"); };
 document.getElementById('importBtn').onclick=()=>document.getElementById('importFile').click();
 document.getElementById('importFile').onchange=e=>{ const f=e.target.files[0]; if(!f)return; const r=new FileReader();
-  r.onload=()=>{ try{ const parsed=JSON.parse(r.result); const result=validateImportedDB(parsed); if(!result.ok){ toast(result.message||"Invalid file"); return; } DB=result.db; normalizeDB(); save(); rememberSession('local'); refreshAll(); closeSheets(); toast("Imported ✓"); }catch(_){ toast("Could not read file"); } finally{ e.target.value=''; } }; r.readAsText(f); };
+  r.onload=()=>{ try{
+    const result=validateImportedDB(JSON.parse(r.result));
+    if(!result.ok){ toast(result.message||"Invalid file"); return; }
+    if(hasStoredProfile(ACTIVE_PROFILE)) saveRecoveryCopy();
+    DB=mergeProfileData(DB,result.db);
+    normalizeDB(); save();
+    if(!CLOUD.user) rememberSession('local');
+    refreshAll(); closeSheets();
+    toast(CLOUD.user?'Imported and merged · syncing to Google':'Imported and merged locally');
+  }catch(_){ toast("Could not read file"); } finally{ e.target.value=''; } }; r.readAsText(f); };
 document.getElementById('seedBtn').onclick=()=>{ seed(); closeSheets(); toast("Program loaded 📋"); };
 document.getElementById('logoutBtn').onclick=()=>logout();
-document.getElementById('wipeBtn').onclick=()=>{ if(confirm("Erase ALL data? Cannot be undone.")){ DB=blankDB(); DB.initialized=true; save(); refreshAll(); document.getElementById('importBtn').scrollIntoView({block:'center'}); toast("Erased"); } };
+document.getElementById('wipeBtn').onclick=()=>{
+  if(CLOUD.user){ toast('Sign out of Google before erasing a local profile.'); return; }
+  if(confirm("Erase ALL data? Cannot be undone.")){ DB=blankDB(); DB.initialized=true; save(); refreshAll(); document.getElementById('importBtn').scrollIntoView({block:'center'}); toast("Erased"); }
+};

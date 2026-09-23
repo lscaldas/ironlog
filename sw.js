@@ -1,18 +1,19 @@
-const CACHE_NAME = 'ironlog-static-v36';
+const CACHE_NAME = 'ironlog-static-v37';
 const APP_SHELL = [
   './',
   './index.html',
-  './styles.css?v=36',
-  './cloud-config.js?v=36',
-  './js/storage.js?v=36',
-  './js/catalog-data.js?v=36',
-  './js/helpers.js?v=36',
-  './js/week.js?v=36',
-  './js/exercises.js?v=36',
-  './js/stats.js?v=36',
-  './js/data.js?v=36',
-  './js/cloud.js?v=36',
-  './js/init.js?v=36',
+  './styles.css?v=37',
+  './firebase-config.js?v=37',
+  './js/storage.js?v=37',
+  './js/catalog-data.js?v=37',
+  './js/helpers.js?v=37',
+  './js/week.js?v=37',
+  './js/exercises.js?v=37',
+  './js/stats.js?v=37',
+  './js/merge.js?v=37',
+  './js/data.js?v=37',
+  './js/firebase-cloud.js?v=37',
+  './js/init.js?v=37',
   './manifest.webmanifest',
   './icons/icon.svg'
 ];
@@ -35,8 +36,7 @@ self.addEventListener('activate', event => {
 
 self.addEventListener('fetch', event => {
   if (event.request.method !== 'GET') return;
-  // Never cache cross-origin requests (e.g. Supabase API responses) —
-  // serving a stale encrypted profile offline would corrupt sync state.
+  // Never cache cross-origin Firebase requests.
   if (new URL(event.request.url).origin !== self.location.origin) return;
 
   if (event.request.mode === 'navigate') {

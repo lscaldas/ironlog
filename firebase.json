@@ -1,0 +1,46 @@
+{
+  "firestore": {
+    "rules": "firestore.rules"
+  },
+  "hosting": {
+    "site": "ironlog-43233",
+    "public": ".",
+    "ignore": [
+      "firebase.json",
+      ".firebaserc",
+      "firestore.rules",
+      "**/.*",
+      ".git/**",
+      ".github/**",
+      ".claude/**",
+      ".gstack/**",
+      ".transcription_crops/**",
+      "**/node_modules/**",
+      "tests/**",
+      "docs/**",
+      "test-results/**",
+      "playwright-report/**",
+      "playwright-results/**",
+      "**/*.xlsx",
+      "recreated_workout_tables.xlsx",
+      "package.json",
+      "package-lock.json",
+      "playwright.config.js",
+      "CLAUDE.md",
+      "README.md",
+      "supabase.sql",
+      "cloud-config.js",
+      "js/cloud.js"
+    ],
+    "headers": [
+      {
+        "source": "**/*.html",
+        "headers": [{ "key": "Cache-Control", "value": "no-cache" }]
+      },
+      {
+        "source": "sw.js",
+        "headers": [{ "key": "Cache-Control", "value": "no-cache" }]
+      }
+    ]
+  }
+}

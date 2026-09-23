@@ -2,7 +2,7 @@
   "name": "ironlog",
   "version": "1.0.0",
   "private": true,
-  "description": "IronLog — a static workout tracker PWA. Hosted on GitHub Pages with no build step.",
+  "description": "IronLog — a static workout tracker PWA with Firebase sync and no build step.",
   "scripts": {
     "start:smoke": "node tests/smoke/static-server.cjs",
     "test:smoke": "playwright test tests/smoke",

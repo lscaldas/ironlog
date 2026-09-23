@@ -12,17 +12,16 @@
 <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="icons/icon.svg">
 <title>IronLog — Weekly Sets</title>
-<link rel="stylesheet" href="styles.css?v=36">
+<link rel="stylesheet" href="styles.css?v=37">
 </head>
 <body>
 <div class="gate" id="profileGate">
   <div class="gate-card">
     <div class="gate-logo">🏋️</div>
     <h2>Open IronLog</h2>
-    <p>Use a profile name and PIN. New profile names are created on first save.</p>
-    <div class="field"><label>Profile name</label><input id="gateProfile" autocomplete="username" placeholder="e.g. lucas"></div>
-    <div class="field"><label>PIN</label><input id="gatePin" type="password" inputmode="numeric" autocomplete="current-password" placeholder="Your profile PIN"></div>
-    <button class="btn" id="gateOpenBtn" type="button">Open profile</button>
+    <p>Sign in with Google to sync workouts across devices. You can import an IronLog JSON backup after signing in.</p>
+    <button class="btn" id="gateGoogleBtn" type="button">Continue with Google</button>
+    <div class="field" style="margin-top:18px;"><label for="gateProfile">Local profile name</label><input id="gateProfile" autocomplete="off" placeholder="e.g. lucas"></div>
     <button class="ghost" id="gateLocalBtn" type="button" style="width:100%;margin-top:9px;">Use local only</button>
     <p class="h3sub" id="gateMsg" style="margin:12px 0 0;"></p>
   </div>
@@ -211,31 +210,20 @@
 <div class="sheet" id="dataSheet">
   <div class="grab"></div>
   <h3>Data &amp; backup</h3>
-  <p class="h3sub">Stored locally first. Cloud sync keeps encrypted profile backups when configured.</p>
+  <p class="h3sub">Workouts are saved on this device first. Sign in with Google to sync them between devices.</p>
   <div class="card" style="box-shadow:none;margin-bottom:10px;">
     <div class="card-h"><h2>Profile</h2><div class="sub" id="cloudState">Local only</div></div>
-    <div class="field">
-      <label>Profile name</label>
+    <div class="field" id="localProfileField">
+      <label for="profileInput">Local profile name</label>
       <input id="profileInput" autocomplete="username" placeholder="e.g. lucas">
     </div>
-    <div class="field">
-      <label>Cloud PIN</label>
-      <input id="cloudPin" type="password" inputmode="numeric" autocomplete="current-password" placeholder="PIN for this profile">
-    </div>
+    <p class="h3sub" id="cloudIdentity">No Google account connected</p>
     <div class="row">
-      <button class="ghost" id="cloudLoadBtn" type="button">Merge cloud</button>
-      <button class="ghost" id="cloudSaveBtn" type="button">Save cloud</button>
+      <button class="ghost" id="cloudSignInBtn" type="button">Continue with Google</button>
+      <button class="ghost" id="cloudSyncBtn" type="button" hidden>Sync now</button>
+      <button class="ghost" id="cloudSignOutBtn" type="button" hidden>Sign out</button>
     </div>
-    <p class="h3sub" id="cloudHelp" style="margin:10px 0 0;">Cloud sync needs Supabase URL/key in cloud-config.js.</p>
-    <div class="pin-change">
-      <label>Change cloud PIN</label>
-      <div class="row">
-        <div class="field"><input id="oldCloudPin" type="password" inputmode="numeric" autocomplete="current-password" placeholder="Old PIN"></div>
-        <div class="field"><input id="newCloudPin" type="password" inputmode="numeric" autocomplete="new-password" placeholder="New PIN"></div>
-      </div>
-      <button class="ghost" id="changePinBtn" type="button" style="width:100%;">Change PIN</button>
-      <p class="h3sub" id="pinChangeMsg" style="margin:10px 0 0;"></p>
-    </div>
+    <p class="h3sub" id="cloudHelp" style="margin:10px 0 0;">Sign in with Google to sync.</p>
   </div>
   <button class="ghost" id="exportBtn" style="width:100%;margin-bottom:10px;">⬇️ Export data (JSON)</button>
   <div class="card" id="recoveryCopies" hidden style="box-shadow:none;margin-bottom:10px;">
@@ -244,7 +232,7 @@
     <div class="field"><label for="recoveryCopySelect">Choose a copy</label><select id="recoveryCopySelect"></select></div>
     <button class="ghost" id="mergeRecoveryBtn" type="button" style="width:100%;">Merge selected copy</button>
   </div>
-  <button class="ghost" id="importBtn" style="width:100%;margin-bottom:10px;">⬆️ Import data (JSON)</button>
+  <button class="ghost" id="importBtn" style="width:100%;margin-bottom:10px;">⬆️ Import data (JSON) · merge</button>
   <input type="file" id="importFile" accept="application/json" style="display:none;">
   <button class="ghost" id="removeSampleBtn" type="button" hidden style="width:100%;margin-bottom:10px;">Remove generated sample sets</button>
   <p class="h3sub" id="sampleCleanupHelp" hidden style="margin:-3px 0 10px;">Generated example sets are excluded from History and Progress. Removing them saves a local recovery copy first.</p>
@@ -256,15 +244,16 @@
 
 <div class="toast" id="toast"></div>
 
-<script src="cloud-config.js?v=36"></script>
-<script src="js/storage.js?v=36"></script>
-<script src="js/catalog-data.js?v=36"></script>
-<script src="js/helpers.js?v=36"></script>
-<script src="js/week.js?v=36"></script>
-<script src="js/exercises.js?v=36"></script>
-<script src="js/stats.js?v=36"></script>
-<script src="js/data.js?v=36"></script>
-<script src="js/cloud.js?v=36"></script>
-<script src="js/init.js?v=36"></script>
+<script src="firebase-config.js?v=37"></script>
+<script src="js/storage.js?v=37"></script>
+<script src="js/catalog-data.js?v=37"></script>
+<script src="js/helpers.js?v=37"></script>
+<script src="js/week.js?v=37"></script>
+<script src="js/exercises.js?v=37"></script>
+<script src="js/stats.js?v=37"></script>
+<script src="js/merge.js?v=37"></script>
+<script src="js/data.js?v=37"></script>
+<script src="js/firebase-cloud.js?v=37"></script>
+<script src="js/init.js?v=37"></script>
 </body>
 </html>

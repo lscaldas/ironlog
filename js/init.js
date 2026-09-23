@@ -156,6 +156,7 @@ window.addEventListener('focus',syncCurrentWeekView);
 renderCatalog();
 updateCloudUI();
 if(AUTH_SESSION) hideProfileGate(); else showProfileGate();
+initFirebaseSync();
 
 // A hidden page or closed app ends a session at the last observable time.
 function saveWorkoutOnLeave(){
@@ -172,6 +173,6 @@ window.addEventListener('pagehide',saveWorkoutOnLeave);
 
 if('serviceWorker' in navigator){
   window.addEventListener('load',()=>{
-    navigator.serviceWorker.register('./sw.js?v=36').then(reg=>reg.update()).catch(()=>{});
+    navigator.serviceWorker.register('./sw.js?v=37').then(reg=>reg.update()).catch(()=>{});
   });
 }
