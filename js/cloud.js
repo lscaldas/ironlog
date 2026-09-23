@@ -79,6 +79,9 @@ function starterExerciseKey(ex){
   return normName(ex.name)+'|'+variantOf(ex);
 }
 function mergeProfileData(local,remote){
+  const deletedSetIds=[...new Set([...(remote.deletedSetIds||[]),...(local.deletedSetIds||[])])];
+  const deletedWorkoutIds=[...new Set([...(remote.deletedWorkoutIds||[]),...(local.deletedWorkoutIds||[])])];
+  const deletedSets=new Set(deletedSetIds),deletedWorkouts=new Set(deletedWorkoutIds);
   const localGyms=Array.isArray(local.gyms)?local.gyms:[];
   const remoteGyms=Array.isArray(remote.gyms)?remote.gyms:[];
   const gyms=remoteGyms.map(g=>({...g}));
@@ -118,8 +121,11 @@ function mergeProfileData(local,remote){
     else { workoutIds.set(w.id,workouts.length); workouts.push(mapped); }
   });
   const active=local.activeWorkout||remote.activeWorkout;
-  const activeWorkout=active&&!workoutIds.has(active.id)?{...active,locationId:mapGym(active.locationId),setIds:[...(active.setIds||[])]}:null;
-  return {...remote,...local,initialized:true,schemaVersion:5,gyms,exercises,sets,workouts,activeWorkout,
+  const activeWorkout=active&&!workoutIds.has(active.id)&&!deletedWorkouts.has(active.id)?{...active,locationId:mapGym(active.locationId),setIds:(active.setIds||[]).filter(id=>!deletedSets.has(id))}:null;
+  return {...remote,...local,initialized:true,schemaVersion:6,gyms,exercises,
+    sets:sets.filter(set=>!deletedSets.has(set.id)),
+    workouts:workouts.filter(workout=>!deletedWorkouts.has(workout.id)).map(workout=>({...workout,setIds:workout.setIds.filter(id=>!deletedSets.has(id))})),
+    deletedSetIds,deletedWorkoutIds,activeWorkout,
     weekPlans:{...(remote.weekPlans||{}),...(local.weekPlans||{})}};
 }
 async function loadCloudProfile(opts={}){
@@ -142,13 +148,13 @@ async function loadCloudProfile(opts={}){
     if(ACTIVE_PROFILE!==profile) return false;
     try{ saveRecoveryCopy(profile); }
     catch(_){ toast('Could not back up local data. Export it before loading cloud.'); updateCloudUI(); return false; }
-    const localSetCount=DB.sets.length;
+    const localSetCount=recordedSets().length;
     DB=mergeProfileData(DB,remote);
     CLOUD.pin=pin; CLOUD.unlocked=true; CLOUD.syncError=false;
     normalizeDB();
     save();
     refreshAll();
-    toast(`Cloud merged · ${DB.sets.length} sets (${localSetCount} local)`);
+    toast(`Cloud merged · ${recordedSets().length} logged sets (${localSetCount} local)`);
     if(opts.fromGate){ rememberSession('cloud'); hideProfileGate(); }
     updateCloudUI();
     return true;
@@ -389,24 +395,10 @@ document.getElementById('profileGate').addEventListener('keydown',e=>{
   }
 });
 
-function seed(withHistory){
-  DB={schemaVersion:5,initialized:true,exercises:SEED.map(s=>({id:uid('e'),...s,variant:variantOf(s)})), sets:[],workouts:[],activeWorkout:null,weekPlans:{},gyms:[]};
-  if(withHistory){
-    // 7 weeks of progressing data
-    const baseKg={"Cable Rows":30,"Overhead Press":30,"Single-arm Face Pulls":15,"Cable Squats":40,"Single Cable Leg Curl":30,"Cable Single-leg Calf Raise":35,"Ring Dips":0,"Triceps Pulldown":22.5,"Triceps Overhead Ext.":20,"Cable Lateral Raise - Lower Path":10,"Cable Lateral Raise - Upper Path":7.5,"Bayesian Single-arm Curl":12.5,"Single-arm Cable Shrugs":25,Pullups:0,Pushups:0};
-    for(let wk=6; wk>=0; wk--){
-      const mon=new Date(thisWeek()+"T00:00:00"); mon.setDate(mon.getDate()-wk*7);
-      DB.exercises.forEach(e=>{
-        const sets = wk===0 ? Math.floor(Math.random()*e.target) : e.target; // current week partial
-        let kg=(baseKg[e.name]||10)+(6-wk)*e.inc*0.7;
-        kg=Math.round(kg/e.inc)*e.inc;
-        for(let i=0;i<sets;i++){
-          const day=new Date(mon); day.setDate(day.getDate()+Math.floor(i*1.6)%6);
-          const reps=e.name==='Pushups'?18+Math.floor(Math.random()*10): (e.name==='Pullups'||e.name==='Ring Dips')?e.low+Math.floor(Math.random()*4): e.low+Math.floor(Math.random()*(e.high-e.low+1));
-          DB.sets.push({id:uid('s'),exId:e.id,date:dateKey(day),ts:day.getTime()+i*1000+Math.random()*999,reps,kg:(e.name==='Pullups'||e.name==='Pushups'||e.name==='Ring Dips')?0:kg});
-        }
-      });
-    }
-  }
+function seed(){
+  markDeletedRecords(DB.sets.map(set=>set.id),DB.workouts.map(workout=>workout.id).concat(DB.activeWorkout?.id||[]));
+  const deletedSetIds=DB.deletedSetIds,deletedWorkoutIds=DB.deletedWorkoutIds;
+  DB={schemaVersion:6,initialized:true,exercises:SEED.map(s=>({id:uid('e'),...s,variant:variantOf(s)})),
+    sets:[],workouts:[],activeWorkout:null,weekPlans:{},gyms:[],deletedSetIds,deletedWorkoutIds};
   save(); refreshAll();
 }

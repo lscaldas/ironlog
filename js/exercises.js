@@ -239,17 +239,19 @@ document.getElementById('catalogSearch').oninput=renderCatalog;
 function renderHistory(){
   const nameOf=id=>(DB.exercises.find(e=>e.id===id)||{}).name||'(removed)';
   const completed=DB.workouts.filter(w=>w.status==='completed').sort((a,b)=>(b.endedAt||b.startedAt)-(a.endedAt||a.startedAt));
-  const completedIds=new Set(completed.map(w=>w.id));
-  const completedSetIds=new Set(completed.flatMap(w=>w.setIds||[]));
-  const activeId=currentActiveWorkout()?.id;
-  const legacySets=DB.sets.filter(s=>!completedSetIds.has(s.id)&&s.workoutId!==activeId&&!completedIds.has(s.workoutId));
+  const active=currentActiveWorkout();
+  const activeSets=setsForWorkout(active);
+  const shownSetIds=new Set(completed.flatMap(w=>setsForWorkout(w).map(s=>s.id)).concat(activeSets.map(s=>s.id)));
+  const legacySets=recordedSets().filter(s=>!shownSetIds.has(s.id));
   const byDay={};
   legacySets.forEach(s=>{(byDay[s.date]=byDay[s.date]||[]).push(s);});
   const days=Object.keys(byDay).sort().reverse();
-  const totalEntries=completed.length+days.length;
+  const totalEntries=completed.length+days.length+(activeSets.length?1:0);
   document.getElementById('histEmpty').style.display=totalEntries?'none':'block';
-  document.getElementById('histCount').textContent=completed.length?`${completed.length} session${completed.length===1?'':'s'}`:(days.length?days.length+" legacy days":'');
-  const sessionHtml=completed.map(w=>{
+  const recordedCount=recordedSets().length;
+  document.getElementById('histCount').textContent=recordedCount?`${recordedCount} logged set${recordedCount===1?'':'s'}`:'';
+  const sessionHtml=(activeSets.length?[active,...completed]:completed).map(w=>{
+    const inProgress=w.status==='active';
     const sets=setsForWorkout(w); const byEx={};
     sets.forEach(s=>{(byEx[s.exId]=byEx[s.exId]||[]).push(s);});
     const rows=Object.keys(byEx).map(id=>{
@@ -257,13 +259,13 @@ function renderHistory(){
       return `<div class="day-ex"><div class="nm">${esc(nameOf(id))} <span style="color:var(--dim);font-weight:400">·${ss.length} set${ss.length>1?'s':''}</span></div>
         <div class="st">${ss.map(s=>`<span class="history-set"><span>${s.reps}×${fmtW(s.kg)}</span><button class="historyEditSet" type="button" data-sid="${esc(s.id)}" aria-label="Edit set ${s.reps} by ${fmtW(s.kg)}">Edit</button></span>`).join('<span aria-hidden="true"> · </span>')}</div></div>`;
     }).join('');
-    const label=`Completed workout session ${relDay(w.date||dateKey(new Date(w.startedAt)))} duration ${workoutDuration(w.startedAt,w.endedAt||w.startedAt)} ${sets.length} set${sets.length===1?'':'s'}`;
-    return `<div class="day session" data-wid="${esc(w.id)}">
+    const label=`${inProgress?'Workout in progress':'Completed workout session'} ${relDay(w.date||dateKey(new Date(w.startedAt)))} ${sets.length} set${sets.length===1?'':'s'}`;
+    return `<div class="day session" data-wid="${esc(w.id)}" data-sort="${inProgress?Date.now():(w.endedAt||w.startedAt)}">
       <button class="session-row day-h" type="button" aria-expanded="false" aria-label="${esc(label)}">
-        <div><div class="day-date">Completed workout session</div>
+        <div><div class="day-date">${inProgress?'Workout in progress':'Completed workout session'}</div>
         <div class="day-sum">${relDay(w.date||dateKey(new Date(w.startedAt)))} · ${esc(w.locationName||locationName(w.locationId||'home'))} · duration ${workoutDuration(w.startedAt,w.endedAt||w.startedAt)} · ${sets.length} set${sets.length===1?'':'s'} · ${Object.keys(byEx).length} exercise${Object.keys(byEx).length===1?'':'s'}</div></div><span class="chev">›</span>
       </button>
-      <div class="session-actions"><button class="ghost btn-sm deleteWorkoutBtn" type="button">Delete</button></div>
+      ${inProgress?'':'<div class="session-actions"><button class="ghost btn-sm deleteWorkoutBtn" type="button">Delete</button></div>'}
       <div class="day-body">${rows||'<div class="sub">No sets saved in this workout.</div>'}</div>
     </div>`;
   }).join('');
@@ -273,13 +275,15 @@ function renderHistory(){
     const rows=Object.keys(byEx).map(id=>{
       const ss=byEx[id].sort((a,b)=>a.ts-b.ts);
       return `<div class="day-ex"><div class="nm">${esc(nameOf(id))} <span style="color:var(--dim);font-weight:400">·${ss.length} set${ss.length>1?'s':''}</span></div>
-        <div class="st">${ss.map(s=>s.reps+'×'+fmtW(s.kg)).join('  ·  ')}</div></div>`;
+        <div class="st">${ss.map(s=>`<span class="history-set"><span>${s.reps}×${fmtW(s.kg)}</span><button class="historyEditSet" type="button" data-sid="${esc(s.id)}" aria-label="Edit set ${s.reps} by ${fmtW(s.kg)}">Edit</button></span>`).join('<span aria-hidden="true"> · </span>')}</div></div>`;
     }).join('');
-    return `<div class="day legacy"><div class="day-h"><div><div class="day-date">${relDay(d)} legacy sets</div>
+    return `<div class="day legacy" data-sort="${new Date(d+'T23:59:59').getTime()}"><div class="day-h"><div><div class="day-date">${relDay(d)} logged sets</div>
       <div class="day-sum">${sets.length} sets · ${Object.keys(byEx).length} exercises</div></div><span class="chev">›</span></div>
       <div class="day-body">${rows}</div></div>`;
   }).join('');
-  document.getElementById('histList').innerHTML=sessionHtml+legacyHtml;
+  const list=document.getElementById('histList');
+  list.innerHTML=sessionHtml+legacyHtml;
+  [...list.querySelectorAll('.day')].sort((a,b)=>Number(b.dataset.sort)-Number(a.dataset.sort)).forEach(row=>list.appendChild(row));
   document.querySelectorAll('#histList .day').forEach(n=>{
     const row=n.querySelector('.day-h');
     row.onclick=()=>{

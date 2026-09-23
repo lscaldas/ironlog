@@ -13,7 +13,7 @@ function sanitizeProfileId(s){
     .slice(0,32);
 }
 function blankDB(){
-  return {schemaVersion:5,initialized:false,exercises:[],sets:[],workouts:[],activeWorkout:null,weekPlans:{},gyms:[]};
+  return {schemaVersion:6,initialized:false,exercises:[],sets:[],workouts:[],activeWorkout:null,weekPlans:{},gyms:[],deletedSetIds:[],deletedWorkoutIds:[]};
 }
 function profileKeyFor(profile){ return KEY_PREFIX+profile; }
 function profileKey(){ return profileKeyFor(ACTIVE_PROFILE); }
@@ -49,7 +49,7 @@ function load(profile=ACTIVE_PROFILE){
   return blankDB();
 }
 function save(){
-  DB.schemaVersion=5;
+  DB.schemaVersion=6;
   DB.initialized=true;
   localStorage.setItem(profileKey(),JSON.stringify(DB));
   queueCloudSave();

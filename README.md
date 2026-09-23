@@ -22,6 +22,7 @@ The weekly selection is stored by Monday date, survives reload/export/cloud sync
 - Previous weights are suggested only for the same exercise, equipment variant, and location.
 - **Finish workout** saves immediately. Moving away from the app or closing it saves any active workout with logged sets. If an older active workout remains after a crash, the next launch asks for its duration and suggests 60 minutes when enough time has elapsed.
 - **Progress** shows weekly effective set volume for Legs, Core, Push, and Pull, plus one selected muscle with Maintain, Build, and Beast threshold lines. Weeks without sets appear as zero.
+- Older versions could generate seven weeks of example sets through **Load my program + sample history**. Those sets are excluded from History, muscle bars, and Progress. **Data & backup** offers a selective removal action when it recognizes them; it saves a local recovery copy first. Real logged sets remain untouched.
 
 ## Data model
 

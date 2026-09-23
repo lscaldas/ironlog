@@ -38,6 +38,9 @@ function validateImportedDB(raw){
   if(raw.activeWorkout!==undefined&&raw.activeWorkout!==null&&!isPlainObject(raw.activeWorkout)) return {ok:false,message:"Invalid file"};
   if(raw.weekPlans!==undefined&&!isPlainObject(raw.weekPlans)) return {ok:false,message:"Invalid file"};
   if(raw.gyms!==undefined&&!Array.isArray(raw.gyms)) return {ok:false,message:"Invalid file"};
+  for(const key of ['deletedSetIds','deletedWorkoutIds']){
+    if(raw[key]!==undefined&&(!Array.isArray(raw[key])||raw[key].some(id=>typeof id!=='string'||!id))) return {ok:false,message:"Invalid file"};
+  }
 
   const next=Object.assign(blankDB(), raw, {
     exercises: raw.exercises.map(e=>isPlainObject(e)?Object.assign({}, e):e),
@@ -86,6 +89,7 @@ function validateImportedDB(raw){
     if(!kg.ok) return {ok:false,message:"Invalid file"};
     if(set.locationId!==undefined&&typeof set.locationId!=='string') return {ok:false,message:"Invalid file"};
     if(set.variant!==undefined&&!EQUIPMENT_VARIANTS.includes(set.variant)) return {ok:false,message:"Invalid file"};
+    if(set.generatedSample!==undefined&&typeof set.generatedSample!=='boolean') return {ok:false,message:"Invalid file"};
     const dateCheck=validateImportDate(set.date,set.ts);
     if(!dateCheck.ok) return dateCheck;
     next.sets.push(Object.assign({}, set, {reps:reps.value, kg:kg.value}));
@@ -143,6 +147,16 @@ function validateImportedDB(raw){
 }
 
 /* ================= Data menu ================= */
+function generatedSampleSets(){
+  return DB.sets.filter(set=>set.generatedSample===true);
+}
+function updateSampleCleanupUI(){
+  const count=generatedSampleSets().length;
+  const button=document.getElementById('removeSampleBtn');
+  button.hidden=!count;
+  document.getElementById('sampleCleanupHelp').hidden=!count;
+  button.textContent=`Remove ${count} generated sample set${count===1?'':'s'}`;
+}
 function updateRecoveryUI(){
   const keys=recoveryCopyKeys();
   const wrap=document.getElementById('recoveryCopies');
@@ -160,7 +174,7 @@ function updateRecoveryUI(){
     select.appendChild(option);
   });
 }
-function openDataSheet(){ updateRecoveryUI(); openSheet('dataSheet'); }
+function openDataSheet(){ updateRecoveryUI(); updateSampleCleanupUI(); openSheet('dataSheet'); }
 document.getElementById('menuBtn').onclick=openDataSheet;
 document.getElementById('profilePill').onclick=openDataSheet;
 document.getElementById('mergeRecoveryBtn').onclick=()=>{
@@ -178,11 +192,22 @@ document.getElementById('mergeRecoveryBtn').onclick=()=>{
     toast('Saved copy merged');
   }catch(_){ toast('Could not merge saved copy'); }
 };
+document.getElementById('removeSampleBtn').onclick=()=>{
+  const sampleSets=generatedSampleSets();
+  if(!sampleSets.length){ updateSampleCleanupUI(); return; }
+  if(!confirm(`Remove ${sampleSets.length} generated sample sets? Real logged sets will remain. A local recovery copy will be saved first.`)) return;
+  try{ if(!saveRecoveryCopy()) throw new Error('No local backup'); }
+  catch(_){ toast('Could not save a recovery copy. Export JSON first.'); return; }
+  const ids=new Set(sampleSets.map(set=>set.id));
+  markDeletedRecords([...ids]);
+  DB.sets=DB.sets.filter(set=>!ids.has(set.id));
+  save(); refreshAll(); updateRecoveryUI(); updateSampleCleanupUI();
+  toast(`${ids.size} sample sets removed`);
+};
 document.getElementById('exportBtn').onclick=()=>{ const b=new Blob([JSON.stringify(DB,null,2)],{type:'application/json'}); const a=document.createElement('a'); a.href=URL.createObjectURL(b); a.download='ironlog-'+todayKey()+'.json'; a.click(); toast("Exported ✓"); };
 document.getElementById('importBtn').onclick=()=>document.getElementById('importFile').click();
 document.getElementById('importFile').onchange=e=>{ const f=e.target.files[0]; if(!f)return; const r=new FileReader();
   r.onload=()=>{ try{ const parsed=JSON.parse(r.result); const result=validateImportedDB(parsed); if(!result.ok){ toast(result.message||"Invalid file"); return; } DB=result.db; normalizeDB(); save(); rememberSession('local'); refreshAll(); closeSheets(); toast("Imported ✓"); }catch(_){ toast("Could not read file"); } finally{ e.target.value=''; } }; r.readAsText(f); };
-document.getElementById('seedBtn').onclick=()=>{ seed(false); closeSheets(); toast("Program loaded 📋"); };
-document.getElementById('demoBtn').onclick=()=>{ seed(true); closeSheets(); toast("Sample loaded ✨"); };
+document.getElementById('seedBtn').onclick=()=>{ seed(); closeSheets(); toast("Program loaded 📋"); };
 document.getElementById('logoutBtn').onclick=()=>logout();
 document.getElementById('wipeBtn').onclick=()=>{ if(confirm("Erase ALL data? Cannot be undone.")){ DB=blankDB(); DB.initialized=true; save(); refreshAll(); document.getElementById('importBtn').scrollIntoView({block:'center'}); toast("Erased"); } };

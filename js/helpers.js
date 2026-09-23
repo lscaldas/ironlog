@@ -1,7 +1,22 @@
 "use strict";
 /* ================= Helpers ================= */
-const setsFor=(exId,mk)=>DB.sets.filter(s=>s.exId===exId && mondayOf(s.date)===mk);
-const allSetsFor=exId=>DB.sets.filter(s=>s.exId===exId).sort((a,b)=>a.ts-b.ts);
+const recordedSets=()=>DB.sets.filter(set=>set.generatedSample!==true);
+const setsFor=(exId,mk)=>recordedSets().filter(s=>s.exId===exId && mondayOf(s.date)===mk);
+const allSetsFor=exId=>recordedSets().filter(s=>s.exId===exId).sort((a,b)=>a.ts-b.ts);
+function sampleSetCreationTime(id){
+  const match=typeof id==='string'&&/^s([0-9a-z]+)([0-9a-z]{3})$/.exec(id);
+  return match?parseInt(match[1],36):NaN;
+}
+function detectGeneratedSampleSets(sets){
+  const candidates=sets.filter(set=>{
+    if(set.workoutId||!Number.isFinite(set.ts)||typeof set.date!=='string'||!/^\d{4}-\d{2}-\d{2}$/.test(set.date)) return false;
+    const midnight=new Date(set.date+'T00:00:00').getTime();
+    return set.ts>=midnight&&set.ts<midnight+60000&&Number.isFinite(sampleSetCreationTime(set.id));
+  });
+  const fractionalTimes=candidates.filter(set=>!Number.isInteger(set.ts)).map(set=>sampleSetCreationTime(set.id));
+  const batchTimes=fractionalTimes.filter(time=>fractionalTimes.filter(other=>Math.abs(other-time)<5*60*1000).length>=10);
+  return candidates.filter(set=>batchTimes.some(time=>Math.abs(sampleSetCreationTime(set.id)-time)<5*60*1000));
+}
 const EQUIPMENT_VARIANTS=['Cable','Machine','Free weight','Bodyweight'];
 function variantOf(ex){
   if(EQUIPMENT_VARIANTS.includes(ex.variant)) return ex.variant;
@@ -121,7 +136,7 @@ function currentActiveWorkout(){
 function setsForWorkout(w){
   if(!w) return [];
   const ids=new Set(w.setIds||[]);
-  return DB.sets.filter(s=>s.workoutId===w.id||ids.has(s.id)).sort((a,b)=>a.ts-b.ts);
+  return recordedSets().filter(s=>s.workoutId===w.id||ids.has(s.id)).sort((a,b)=>a.ts-b.ts);
 }
 function workoutTime(ms){
   return new Date(ms).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
@@ -148,6 +163,10 @@ function startWorkout(){
   ensureActiveWorkout(existed?"Workout already active":"Workout started",locationId);
   renderWeek();
 }
+function markDeletedRecords(setIds=[],workoutIds=[]){
+  DB.deletedSetIds=[...new Set((DB.deletedSetIds||[]).concat(setIds))];
+  DB.deletedWorkoutIds=[...new Set((DB.deletedWorkoutIds||[]).concat(workoutIds))];
+}
 function cancelActiveWorkout(){
   const w=currentActiveWorkout();
   if(!w){ toast("No active workout"); return; }
@@ -160,6 +179,7 @@ function cancelActiveWorkout(){
     const ids=new Set(sets.map(s=>s.id));
     DB.sets=DB.sets.filter(s=>!ids.has(s.id));
   }
+  markDeletedRecords(sets.map(s=>s.id),[w.id]);
   DB.activeWorkout=null;
   clearRestTimer();
   save();
@@ -203,6 +223,7 @@ function deleteCompletedWorkout(id){
   if(!w){ toast("Workout not found"); return; }
   if(!confirm("Delete this completed workout? This removes its logged sets and cannot be undone.")) return;
   const ids=new Set((w.setIds||[]).concat(DB.sets.filter(s=>s.workoutId===id).map(s=>s.id)));
+  markDeletedRecords([...ids],[id]);
   DB.sets=DB.sets.filter(s=>!ids.has(s.id));
   DB.workouts=DB.workouts.filter(x=>x.id!==id);
   save();
@@ -213,6 +234,7 @@ function removeLoggedSet(id){
   const set=DB.sets.find(s=>s.id===id);
   if(!set){ toast("Set not found"); return false; }
   if(!confirm(`Remove logged set ${fmtSet(set)}? This cannot be undone.`)) return false;
+  markDeletedRecords([id]);
   DB.sets=DB.sets.filter(s=>s.id!==id);
   if(DB.activeWorkout&&Array.isArray(DB.activeWorkout.setIds)){
     DB.activeWorkout.setIds=DB.activeWorkout.setIds.filter(setId=>setId!==id);

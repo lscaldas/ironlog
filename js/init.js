@@ -3,12 +3,31 @@
 function esc(s){ return (s||"").replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
 function normalizeDB(){
   let dirty=false;
-  if(DB.schemaVersion!==5){ DB.schemaVersion=5; dirty=true; }
+  if(DB.schemaVersion!==6){ DB.schemaVersion=6; dirty=true; }
   if(!Array.isArray(DB.gyms)){ DB.gyms=[]; dirty=true; }
   if(DB.initialized!==true && (DB.exercises?.length||DB.sets?.length)){ DB.initialized=true; dirty=true; }
   if(!Array.isArray(DB.exercises)){ DB.exercises=[]; dirty=true; }
   if(!Array.isArray(DB.sets)){ DB.sets=[]; dirty=true; }
   if(!Array.isArray(DB.workouts)){ DB.workouts=[]; dirty=true; }
+  for(const key of ['deletedSetIds','deletedWorkoutIds']){
+    if(!Array.isArray(DB[key])){ DB[key]=[]; dirty=true; }
+    else{
+      const clean=[...new Set(DB[key].filter(id=>typeof id==='string'&&id))];
+      if(clean.length!==DB[key].length){ DB[key]=clean; dirty=true; }
+    }
+  }
+  const deletedSets=new Set(DB.deletedSetIds),deletedWorkouts=new Set(DB.deletedWorkoutIds);
+  if(deletedSets.size){
+    const before=DB.sets.length;
+    DB.sets=DB.sets.filter(set=>!deletedSets.has(set.id));
+    if(DB.sets.length!==before) dirty=true;
+  }
+  if(deletedWorkouts.size){
+    const before=DB.workouts.length;
+    DB.workouts=DB.workouts.filter(workout=>!deletedWorkouts.has(workout.id));
+    if(DB.workouts.length!==before) dirty=true;
+    if(DB.activeWorkout&&deletedWorkouts.has(DB.activeWorkout.id)){ DB.activeWorkout=null; dirty=true; }
+  }
   if(!DB.weekPlans || typeof DB.weekPlans!=='object' || Array.isArray(DB.weekPlans)){ DB.weekPlans={}; dirty=true; }
   Object.keys(DB.weekPlans).forEach(mk=>{
     const plan=DB.weekPlans[mk];
@@ -89,6 +108,9 @@ function normalizeDB(){
     if(!s.locationId){ s.locationId='home'; dirty=true; }
     if(!EQUIPMENT_VARIANTS.includes(s.variant)){ s.variant=variantOf(DB.exercises.find(e=>e.id===s.exId)||{}); dirty=true; }
   });
+  detectGeneratedSampleSets(DB.sets).forEach(set=>{
+    if(set.generatedSample!==true){ set.generatedSample=true; dirty=true; }
+  });
   const setIds=new Set(DB.sets.map(s=>s.id));
   const seenWorkouts=new Set();
   DB.workouts=DB.workouts.filter(w=>{
@@ -150,6 +172,6 @@ window.addEventListener('pagehide',saveWorkoutOnLeave);
 
 if('serviceWorker' in navigator){
   window.addEventListener('load',()=>{
-    navigator.serviceWorker.register('./sw.js?v=35').then(reg=>reg.update()).catch(()=>{});
+    navigator.serviceWorker.register('./sw.js?v=36').then(reg=>reg.update()).catch(()=>{});
   });
 }

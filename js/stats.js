@@ -8,7 +8,7 @@ function addWeeks(mk,n){ const d=new Date(mk+"T00:00:00"); d.setDate(d.getDate()
 function statWeeks(){
   if(RW<999) return weekList(Math.min(RW,52));
   const current=thisWeek();
-  const logged=DB.sets.map(s=>mondayOf(s.date)).sort();
+  const logged=recordedSets().map(s=>mondayOf(s.date)).sort();
   const start=logged[0]&&logged[0]<current ? logged[0] : current;
   const out=[];
   for(let mk=start; mk<=current; mk=addWeeks(mk,1)) out.push(mk);
@@ -17,9 +17,12 @@ function statWeeks(){
 function renderStats(){
   const weeks=statWeeks();
   const inRange=s=>weeks.includes(mondayOf(s.date));
-  const sets=DB.sets.filter(inRange);
+  const sets=recordedSets().filter(inRange);
   document.getElementById('aVol').textContent=sets.length;
   document.getElementById('aSets').textContent=new Set(sets.map(s=>s.exId)).size;
+  document.getElementById('groupVolumeHelp').textContent=sets.length
+    ? 'Effective sets each week, including weeks with no training.'
+    : 'No sets logged in this range. Every week is 0.';
   // Empty weeks count as zero so the summary reflects lapses in training.
   const hitSum=weeks.reduce((sum,mk)=>{ const progress=weeklyMaintainProgress(mk); return sum+(progress.target?progress.done/progress.target:0); },0);
   document.getElementById('aHit').textContent=(weeks.length?Math.round(hitSum/weeks.length*100):0)+"%";
@@ -51,7 +54,7 @@ function renderStats(){
       <span style="width:54px;text-align:right;font-weight:600;font-variant-numeric:tabular-nums">${v} set${v===1?'':'s'}</span></div>`).join('')
     :`<div class="sub">No set volume yet.</div>`;
 }
-function topSetPerWeek(exId,weeks){ return weeks.map(mk=>bestSet(DB.sets.filter(s=>s.exId===exId&&mondayOf(s.date)===mk))); }
+function topSetPerWeek(exId,weeks){ return weeks.map(mk=>bestSet(recordedSets().filter(s=>s.exId===exId&&mondayOf(s.date)===mk))); }
 
 /* ===== charts ===== */
 function setupCanvas(cv){
@@ -73,6 +76,9 @@ function drawVolumeCharts(weeks){
   if(!muscleNames.includes(SELECTED_MUSCLE)) SELECTED_MUSCLE=muscleNames[0]||'Other';
   select.innerHTML=muscleNames.map(m=>`<option value="${esc(m)}" ${m===SELECTED_MUSCLE?'selected':''}>${esc(m)}</option>`).join('');
   const effective=weeks.map(mk=>muscleEffective(mk));
+  document.getElementById('muscleVolumeHelp').textContent=effective.some(rows=>(rows[SELECTED_MUSCLE]?.eff||0)>0)
+    ? 'Effective sets each week; gaps are 0.'
+    : '0 effective sets for this muscle in the selected weeks.';
   const groupSeries=['Legs','Core','Push','Pull'].map(group=>({
     name:group,color:GROUP_CHART_COLORS[group],
     values:effective.map(rows=>Object.values(rows).filter(r=>(MUSCLE_PPL[r.muscle]||'Other')===group).reduce((sum,r)=>sum+r.eff,0))
@@ -104,11 +110,15 @@ function drawWeeklyLines(cv,weeks,series,thresholds){
     ctx.beginPath(); ctx.moveTo(pad.l,Y(value)); ctx.lineTo(w-pad.r,Y(value)); ctx.stroke(); ctx.setLineDash([]);
     ctx.fillStyle=ctx.strokeStyle; ctx.textAlign='right'; ctx.fillText(['M','B','Beast'][i],w-pad.r-2,Y(value)-3);
   });
-  series.forEach(s=>{
-    ctx.strokeStyle=s.color; ctx.lineWidth=2.5; ctx.beginPath();
-    s.values.forEach((value,i)=>{ if(i) ctx.lineTo(X(i),Y(value)); else ctx.moveTo(X(i),Y(value)); }); ctx.stroke();
-    s.values.forEach((value,i)=>{ ctx.fillStyle=s.color; ctx.beginPath(); ctx.arc(X(i),Y(value),3.5,0,Math.PI*2); ctx.fill(); });
-  });
+  if(series.every(s=>s.values.every(value=>value===0))){
+    weeks.forEach((_,i)=>{ ctx.fillStyle='#a5a9b8'; ctx.beginPath(); ctx.arc(X(i),Y(0),3.5,0,Math.PI*2); ctx.fill(); });
+  }else{
+    series.forEach(s=>{
+      ctx.strokeStyle=s.color; ctx.lineWidth=2.5; ctx.beginPath();
+      s.values.forEach((value,i)=>{ if(i) ctx.lineTo(X(i),Y(value)); else ctx.moveTo(X(i),Y(value)); }); ctx.stroke();
+      s.values.forEach((value,i)=>{ ctx.fillStyle=s.color; ctx.beginPath(); ctx.arc(X(i),Y(value),3.5,0,Math.PI*2); ctx.fill(); });
+    });
+  }
   ctx.fillStyle='#a5a9b8'; ctx.textAlign='center'; ctx.font='10px sans-serif';
   weeks.forEach((mk,i)=>{ const d=new Date(mk+'T00:00:00');ctx.fillText(`${d.getMonth()+1}/${d.getDate()}`,X(i),h-8); });
 }
@@ -117,8 +127,7 @@ function drawSpark(cv,series){ const {ctx,w,h}=setupCanvas(cv); ctx.clearRect(0,
   const max=Math.max(...nz),min=Math.min(...nz); const rng=max-min||1;
   const X=i=>v.length===1?w/2:i*(w-4)/(v.length-1)+2; const Y=val=>h-3-((val-min)/rng)*(h-6);
   ctx.beginPath(); let started=false;
-  v.forEach((val,i)=>{ if(val<=0)return; const x=X(i),y=Y(val); started?ctx.lineTo(x,y):(ctx.moveTo(x,y),started=true); });
+  v.forEach((val,i)=>{ if(val<=0){ started=false; return; } const x=X(i),y=Y(val); started?ctx.lineTo(x,y):(ctx.moveTo(x,y),started=true); });
   ctx.strokeStyle='#5b9dff'; ctx.lineWidth=2; ctx.lineJoin='round'; ctx.stroke();
-  // last point
-  for(let i=v.length-1;i>=0;i--){ if(v[i]>0){ ctx.beginPath(); ctx.arc(X(i),Y(v[i]),2.5,0,7); ctx.fillStyle='#5b9dff'; ctx.fill(); break; } }
+  v.forEach((val,i)=>{ if(val>0){ ctx.beginPath(); ctx.arc(X(i),Y(val),2.5,0,7); ctx.fillStyle='#5b9dff'; ctx.fill(); } });
 }
