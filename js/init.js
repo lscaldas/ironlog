@@ -118,11 +118,19 @@ function normalizeDB(){
   if(dirty) save();
 }
 function refreshAll(){ renderWeek(); renderHistory(); renderStats(); document.getElementById('greeting').textContent=({0:"Sunday",1:"Monday",2:"Tuesday",3:"Wednesday",4:"Thursday",5:"Friday",6:"Saturday"})[new Date().getDay()]+" · weekly sets"; }
+function syncCurrentWeekView(){ if(LAST_RENDERED_WEEK!==thisWeek()) refreshAll(); }
+function scheduleDateRefresh(){
+  const now=new Date(),next=new Date(now);
+  next.setHours(24,0,0,0);
+  setTimeout(()=>{ syncCurrentWeekView(); scheduleDateRefresh(); },next-now+250);
+}
 window.addEventListener('resize',()=>{ if(document.getElementById('v-stats').classList.contains('active'))renderStats(); });
 
 // Initialize the selected profile; new local profiles get the starter program when opened.
 normalizeDB();
 refreshAll();
+scheduleDateRefresh();
+window.addEventListener('focus',syncCurrentWeekView);
 renderCatalog();
 updateCloudUI();
 if(AUTH_SESSION) hideProfileGate(); else showProfileGate();
@@ -134,11 +142,14 @@ function saveWorkoutOnLeave(){
   if(document.getElementById('recoverySheet').classList.contains('show')) return;
   completeActiveWorkout(Date.now(),true);
 }
-document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='hidden') saveWorkoutOnLeave(); });
+document.addEventListener('visibilitychange',()=>{
+  if(document.visibilityState==='hidden') saveWorkoutOnLeave();
+  else syncCurrentWeekView();
+});
 window.addEventListener('pagehide',saveWorkoutOnLeave);
 
 if('serviceWorker' in navigator){
   window.addEventListener('load',()=>{
-    navigator.serviceWorker.register('./sw.js?v=33').then(reg=>reg.update()).catch(()=>{});
+    navigator.serviceWorker.register('./sw.js?v=34').then(reg=>reg.update()).catch(()=>{});
   });
 }

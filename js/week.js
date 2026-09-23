@@ -2,6 +2,7 @@
 /* ================= WEEK view ================= */
 let GMODE=localStorage.getItem('ironlog.gmode')||'muscle';
 if(GMODE==='program'||GMODE==='area') GMODE='muscle';
+let LAST_RENDERED_WEEK=null;
 let GROUP_VIS={};
 try{ GROUP_VIS=JSON.parse(localStorage.getItem('ironlog.groupVis')||'{}')||{}; }catch{ GROUP_VIS={}; }
 const GROUP_ORDER={ region:['Upper','Lower','Core','Other'], ppl:['Push','Pull','Legs','Core','Other'], muscle:MUSCLES.concat(['Other']), area:AREAS.concat(['Other']) };
@@ -136,6 +137,8 @@ function visibleExercises(mk){
 
 function renderWeek(){
   const mk=thisWeek();
+  LAST_RENDERED_WEEK=mk;
+  document.getElementById('muscleWeekLabel').textContent=weekLabel(mk);
   document.getElementById('weekEmpty').style.display=visibleExercises(mk).length?'none':'block';
   const activeLocation=currentActiveWorkout();
   const programCount=DB.exercises.filter(e=>!e.archived).length;

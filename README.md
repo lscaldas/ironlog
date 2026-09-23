@@ -13,7 +13,7 @@ The Week screen is driven by effective-set progress for each muscle, not per-exe
 - Exercise cards show exactly what one set contributes to the muscle bars.
 - At the start of a week, the user chooses Push, Pull, Legs, and/or Core. Unselected groups leave both the exercise list and the weekly completion goal.
 
-The weekly selection is stored by Monday date, survives reload/export/cloud sync, and carries forward as the next week's default. The picker disappears after confirmation and can be reopened with **Change**.
+The weekly selection is stored by Monday date, survives reload/export/cloud sync, and carries forward as the next week's default. After a gap of two or more weeks, the next loadout starts fresh. The home page always uses the current local calendar week and refreshes when the week changes. The picker disappears after confirmation and can be reopened with **Change**.
 
 ## Workouts and locations
 

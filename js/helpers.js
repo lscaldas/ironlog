@@ -41,7 +41,8 @@ function normalizeWeekPlan(raw){
 function defaultWeekPlan(mk=thisWeek()){
   const previousKey=Object.keys(DB.weekPlans||{}).filter(key=>key<mk).sort().reverse()[0];
   const previous=previousKey&&DB.weekPlans[previousKey];
-  const groups=Array.isArray(previous?.groups)?previous.groups.filter(g=>ALL_GROUP_IDS.includes(g)):[];
+  const weeksSincePrevious=previousKey?Math.round((new Date(mk+'T12:00:00')-new Date(previousKey+'T12:00:00'))/(7*24*60*60*1000)):0;
+  const groups=weeksSincePrevious===1&&Array.isArray(previous?.groups)?previous.groups.filter(g=>ALL_GROUP_IDS.includes(g)):[];
   return {groups:groups.length?groups:ALL_GROUP_IDS.slice(),chosen:false};
 }
 function weekPlanFor(mk=thisWeek(),create=false){
