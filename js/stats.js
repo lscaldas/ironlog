@@ -1,6 +1,7 @@
 "use strict";
 /* ================= STATS ================= */
-let RW=8;
+let RW=999;
+let SELECTED_MUSCLE='';
 document.querySelectorAll('#rangeSeg button').forEach(b=>b.onclick=()=>{ document.querySelectorAll('#rangeSeg button').forEach(x=>x.classList.remove('on')); b.classList.add('on'); RW=+b.dataset.w; renderStats(); });
 function weekList(n){ const out=[]; let d=new Date(thisWeek()+"T00:00:00"); for(let i=0;i<n;i++){ out.unshift(dateKey(d)); d.setDate(d.getDate()-7); } return out; }
 function addWeeks(mk,n){ const d=new Date(mk+"T00:00:00"); d.setDate(d.getDate()+n*7); return dateKey(d); }
@@ -19,14 +20,11 @@ function renderStats(){
   const sets=DB.sets.filter(inRange);
   document.getElementById('aVol').textContent=sets.length;
   document.getElementById('aSets').textContent=new Set(sets.map(s=>s.exId)).size;
-  // share of program muscles kept at maintenance, averaged over trained weeks
-  const wks=weeks;
-  let hitSum=0,wkCount=0;
-  wks.forEach(mk=>{ if(mk>thisWeek())return; const progress=weeklyMaintainProgress(mk);
-    if(setsForWeekAny(mk)||mk===thisWeek()){ hitSum+=progress.target?progress.done/progress.target:0; wkCount++; } });
-  document.getElementById('aHit').textContent=(wkCount?Math.round(hitSum/wkCount*100):0)+"%";
+  // Empty weeks count as zero so the summary reflects lapses in training.
+  const hitSum=weeks.reduce((sum,mk)=>{ const progress=weeklyMaintainProgress(mk); return sum+(progress.target?progress.done/progress.target:0); },0);
+  document.getElementById('aHit').textContent=(weeks.length?Math.round(hitSum/weeks.length*100):0)+"%";
 
-  drawSets(weeks);
+  drawVolumeCharts(weeks);
   // best-set progress per exercise
   const pl=document.getElementById('progList');
   const rows=DB.exercises.map(e=>{
@@ -53,7 +51,6 @@ function renderStats(){
       <span style="width:54px;text-align:right;font-weight:600;font-variant-numeric:tabular-nums">${v} set${v===1?'':'s'}</span></div>`).join('')
     :`<div class="sub">No set volume yet.</div>`;
 }
-const setsForWeekAny=mk=>DB.sets.some(s=>mondayOf(s.date)===mk);
 function topSetPerWeek(exId,weeks){ return weeks.map(mk=>bestSet(DB.sets.filter(s=>s.exId===exId&&mondayOf(s.date)===mk))); }
 
 /* ===== charts ===== */
@@ -69,24 +66,52 @@ function setupCanvas(cv){
   ctx.setTransform(dpr,0,0,dpr,0,0);
   return {ctx,w,h};
 }
-function drawSets(weeks){
-  const cv=document.getElementById('setsChart'); const {ctx,w,h}=setupCanvas(cv); ctx.clearRect(0,0,w,h);
-  const data=weeks.map(mk=>DB.sets.filter(s=>mondayOf(s.date)===mk).length);
-  const muscles=new Set(DB.exercises.map(e=>muscleOf(e)||'Other'));
-  let tgt=0; muscles.forEach(m=>{ tgt+=REC_SETS_TIERS.maintain[m]||REC_SETS_TIERS.maintain.Other; });
-  document.getElementById('targetLineLbl').textContent=tgt?('maintain ≈'+tgt+'/wk'):'';
-  const pad={l:6,r:6,t:14,b:20}; const max=Math.max(tgt,...data,1);
-  const bw=(w-pad.l-pad.r)/data.length; const Y=v=>h-pad.b-(v/max)*(h-pad.t-pad.b);
-  // target line
-  if(tgt){ ctx.strokeStyle='rgba(201,182,255,.6)'; ctx.setLineDash([4,4]); ctx.beginPath(); ctx.moveTo(pad.l,Y(tgt)); ctx.lineTo(w-pad.r,Y(tgt)); ctx.stroke(); ctx.setLineDash([]); }
-  data.forEach((v,i)=>{ const x=pad.l+i*bw+bw*0.18, bwid=bw*0.64, y=Y(v);
-    ctx.fillStyle=v>=tgt&&tgt?'#34d399':'#f2556a'; const r=4;
-    const hh=h-pad.b-y; roundRect(ctx,x,y,bwid,Math.max(2,hh),r); ctx.fill();
-  });
-  ctx.fillStyle='#5d6885'; ctx.font='9px sans-serif'; ctx.textAlign='center';
-  weeks.forEach((mk,i)=>{ if(weeks.length>10&&i%2)return; const d=new Date(mk+"T00:00:00"); ctx.fillText((d.getMonth()+1)+'/'+d.getDate(), pad.l+i*bw+bw/2, h-7); });
+const GROUP_CHART_COLORS={Legs:'#34d399',Core:'#fbbf24',Push:'#f2556a',Pull:'#a98bff'};
+function drawVolumeCharts(weeks){
+  const muscleNames=[...new Set(MUSCLES.concat(DB.exercises.map(e=>muscleOf(e)||'Other')))].filter(Boolean);
+  const select=document.getElementById('muscleChartSelect');
+  if(!muscleNames.includes(SELECTED_MUSCLE)) SELECTED_MUSCLE=muscleNames[0]||'Other';
+  select.innerHTML=muscleNames.map(m=>`<option value="${esc(m)}" ${m===SELECTED_MUSCLE?'selected':''}>${esc(m)}</option>`).join('');
+  const effective=weeks.map(mk=>muscleEffective(mk));
+  const groupSeries=['Legs','Core','Push','Pull'].map(group=>({
+    name:group,color:GROUP_CHART_COLORS[group],
+    values:effective.map(rows=>Object.values(rows).filter(r=>(MUSCLE_PPL[r.muscle]||'Other')===group).reduce((sum,r)=>sum+r.eff,0))
+  }));
+  drawWeeklyLines(document.getElementById('groupsChart'),weeks,groupSeries,[]);
+  document.getElementById('groupChartLegend').innerHTML=groupSeries.map(s=>`<span><i style="background:${s.color}"></i>${s.name}</span>`).join('');
+  const thresholds=muscleThresholds(SELECTED_MUSCLE);
+  drawWeeklyLines(document.getElementById('muscleChart'),weeks,[{
+    name:SELECTED_MUSCLE,color:'#a98bff',values:effective.map(rows=>rows[SELECTED_MUSCLE]?.eff||0)
+  }],thresholds);
 }
-function roundRect(ctx,x,y,w,h,r){ r=Math.min(r,w/2,h/2); ctx.beginPath(); ctx.moveTo(x+r,y); ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,0); ctx.arcTo(x,y+h,x,y,0); ctx.arcTo(x,y,x+w,y,r); ctx.closePath(); }
+document.getElementById('muscleChartSelect').onchange=e=>{ SELECTED_MUSCLE=e.target.value; renderStats(); };
+function drawWeeklyLines(cv,weeks,series,thresholds){
+  cv.style.width=Math.max(cv.parentElement.clientWidth,weeks.length*42+55)+'px';
+  const {ctx,w,h}=setupCanvas(cv); ctx.clearRect(0,0,w,h);
+  const pad={l:35,r:15,t:16,b:30};
+  const max=Math.max(1,...thresholds,...series.flatMap(s=>s.values));
+  const top=Math.ceil(max*1.12);
+  const X=i=>pad.l+(weeks.length===1?(w-pad.l-pad.r)/2:i*(w-pad.l-pad.r)/(weeks.length-1));
+  const Y=v=>h-pad.b-v/top*(h-pad.t-pad.b);
+  ctx.font='10px sans-serif'; ctx.fillStyle='#a5a9b8'; ctx.textAlign='right';
+  for(let i=0;i<=4;i++){
+    const value=top*i/4,y=Y(value);
+    ctx.fillText(Number.isInteger(value)?String(value):value.toFixed(1),pad.l-7,y+3);
+    ctx.strokeStyle='rgba(255,255,255,.1)'; ctx.beginPath(); ctx.moveTo(pad.l,y); ctx.lineTo(w-pad.r,y); ctx.stroke();
+  }
+  thresholds.forEach((value,i)=>{
+    ctx.strokeStyle=['#8c76c9','#bfa4ff','#f7d78b'][i]; ctx.setLineDash([5,4]);
+    ctx.beginPath(); ctx.moveTo(pad.l,Y(value)); ctx.lineTo(w-pad.r,Y(value)); ctx.stroke(); ctx.setLineDash([]);
+    ctx.fillStyle=ctx.strokeStyle; ctx.textAlign='right'; ctx.fillText(['M','B','Beast'][i],w-pad.r-2,Y(value)-3);
+  });
+  series.forEach(s=>{
+    ctx.strokeStyle=s.color; ctx.lineWidth=2.5; ctx.beginPath();
+    s.values.forEach((value,i)=>{ if(i) ctx.lineTo(X(i),Y(value)); else ctx.moveTo(X(i),Y(value)); }); ctx.stroke();
+    s.values.forEach((value,i)=>{ ctx.fillStyle=s.color; ctx.beginPath(); ctx.arc(X(i),Y(value),3.5,0,Math.PI*2); ctx.fill(); });
+  });
+  ctx.fillStyle='#a5a9b8'; ctx.textAlign='center'; ctx.font='10px sans-serif';
+  weeks.forEach((mk,i)=>{ const d=new Date(mk+'T00:00:00');ctx.fillText(`${d.getMonth()+1}/${d.getDate()}`,X(i),h-8); });
+}
 function drawSpark(cv,series){ const {ctx,w,h}=setupCanvas(cv); ctx.clearRect(0,0,w,h);
   const v=series.map(x=>x); const nz=v.filter(x=>x>0); if(nz.length<1)return;
   const max=Math.max(...nz),min=Math.min(...nz); const rng=max-min||1;

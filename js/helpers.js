@@ -2,6 +2,16 @@
 /* ================= Helpers ================= */
 const setsFor=(exId,mk)=>DB.sets.filter(s=>s.exId===exId && mondayOf(s.date)===mk);
 const allSetsFor=exId=>DB.sets.filter(s=>s.exId===exId).sort((a,b)=>a.ts-b.ts);
+const EQUIPMENT_VARIANTS=['Cable','Machine','Free weight','Bodyweight'];
+function variantOf(ex){
+  if(EQUIPMENT_VARIANTS.includes(ex.variant)) return ex.variant;
+  const name=((ex.name||'')+' '+(ex.notes||'')).toLowerCase();
+  if(/cable|1cab|pulldown|pushdown|woodchop/.test(name)) return 'Cable';
+  if(/machine|leg press|pec deck|assisted/.test(name)) return 'Machine';
+  if(/pullup|pull-up|pushup|push-up|plank|dip|chin-up/.test(name)) return 'Bodyweight';
+  return 'Free weight';
+}
+function locationName(id){ return id==='home'?'Home':(DB.gyms||[]).find(g=>g.id===id)?.name||'Unknown location'; }
 const fmtW=kg=>kg>0?kg+"kg":"BW";
 const WEEK_LOADOUT_GROUPS=[
   {id:'Push',icon:'⚡',muscles:'Chest · shoulders · triceps'},
@@ -68,7 +78,7 @@ function muscleEffective(mk=thisWeek()){
   const rows={};
   const ensure=m=>rows[m]||(rows[m]={muscle:m,eff:0,direct:0,inProgram:false});
   DB.exercises.forEach(ex=>{
-    ensure(muscleOf(ex)||'Other').inProgram=true;
+    if(!ex.archived) ensure(muscleOf(ex)||'Other').inProgram=true;
     const n=setsFor(ex.id,mk).length;
     if(!n) return;
     exerciseContributions(ex).forEach(p=>{
@@ -121,11 +131,11 @@ function workoutDuration(start,end=Date.now()){
   const h=Math.floor(mins/60), m=mins%60;
   return `${h}h ${m}m`;
 }
-function ensureActiveWorkout(message){
+function ensureActiveWorkout(message,locationId='home'){
   let w=currentActiveWorkout();
   if(w) return w;
   const now=Date.now();
-  w={id:uid('w'),status:'active',startedAt:now,date:todayKey(),setIds:[]};
+  w={id:uid('w'),status:'active',startedAt:now,date:todayKey(),setIds:[],locationId,locationName:locationName(locationId)};
   DB.activeWorkout=w;
   save();
   if(message) toast(message);
@@ -133,7 +143,8 @@ function ensureActiveWorkout(message){
 }
 function startWorkout(){
   const existed=Boolean(currentActiveWorkout());
-  ensureActiveWorkout(existed?"Workout already active":"Workout started");
+  const locationId=document.getElementById('startLocation')?.value||'home';
+  ensureActiveWorkout(existed?"Workout already active":"Workout started",locationId);
   renderWeek();
 }
 function cancelActiveWorkout(){
@@ -149,20 +160,20 @@ function cancelActiveWorkout(){
     DB.sets=DB.sets.filter(s=>!ids.has(s.id));
   }
   DB.activeWorkout=null;
+  clearRestTimer();
   save();
   refreshAll();
   toast(sets.length?"Workout cancelled":"Empty workout cancelled");
 }
 let FINISHING_WORKOUT=false;
-function completeActiveWorkout(){
+function completeActiveWorkout(endedAt=Date.now(),quiet=false){
   if(FINISHING_WORKOUT) return false;
   const w=currentActiveWorkout();
   if(!w){ toast("No active workout"); return false; }
   const sets=setsForWorkout(w);
-  if(!sets.length){ toast("Log a set before finishing"); return false; }
+  if(!sets.length){ DB.activeWorkout=null; clearRestTimer(); save(); closeSheets(); refreshAll(); if(!quiet) toast('Empty workout closed'); return true; }
   FINISHING_WORKOUT=true;
-  document.getElementById('finDoneBtn').disabled=true;
-  const endedAt=Date.now();
+  endedAt=Math.max(w.startedAt,endedAt);
   const setIds=sets.map(s=>s.id);
   if(!DB.workouts.some(done=>done.id===w.id)){
     DB.workouts.push({
@@ -171,16 +182,19 @@ function completeActiveWorkout(){
       startedAt:w.startedAt,
       endedAt,
       date:dateKey(new Date(w.startedAt)),
-      setIds
+      setIds,
+      locationId:w.locationId||'home',
+      locationName:w.locationName||locationName(w.locationId||'home')
     });
   }
   sets.forEach(s=>{ s.workoutId=w.id; });
   DB.activeWorkout=null;
+  clearRestTimer();
   save();
   closeSheets();
   refreshAll();
-  toast("Workout saved");
-  setTimeout(()=>{ FINISHING_WORKOUT=false; document.getElementById('finDoneBtn').disabled=false; },250);
+  if(!quiet) toast("Workout saved");
+  FINISHING_WORKOUT=false;
   return true;
 }
 function deleteCompletedWorkout(id){
@@ -215,18 +229,20 @@ function renderWorkoutPanel(){
   const w=currentActiveWorkout();
   if(!w){
     panel.innerHTML=`<div class="workout-status"><strong>No active workout</strong>Start a session before logging sets.</div>
-      <div class="workout-actions"><button class="btn" id="startWorkoutBtn" type="button">Start workout</button></div>`;
+      <div class="workout-actions"><select id="startLocation" aria-label="Workout location"><option value="home">Home</option>${(DB.gyms||[]).map(g=>`<option value="${esc(g.id)}">${esc(g.name)}</option>`).join('')}</select><button class="btn" id="startWorkoutBtn" type="button">Start workout</button></div>
+      <button class="location-manage" id="manageGymsBtn" type="button">Manage gyms</button>`;
     panel.querySelector('#startWorkoutBtn').onclick=startWorkout;
+    panel.querySelector('#manageGymsBtn').onclick=()=>{ renderGymList(); openSheet('dataSheet'); document.getElementById('gymName').scrollIntoView({block:'center'}); };
     return;
   }
   const count=setsForWorkout(w).length;
-  panel.innerHTML=`<div class="workout-status"><strong>Workout in progress</strong>Started ${workoutTime(w.startedAt)} · ${count} set${count===1?'':'s'} logged</div>
+  panel.innerHTML=`<div class="workout-status"><strong>Workout in progress · ${esc(w.locationName||locationName(w.locationId||'home'))}</strong>Started ${workoutTime(w.startedAt)} · ${count} set${count===1?'':'s'} logged</div>
     <div class="workout-actions">
       <button class="ghost" id="cancelWorkoutBtn" type="button">Cancel workout</button>
       <button class="finbtn" id="finishBtn" type="button" style="margin:0;">Finish workout</button>
     </div>`;
   panel.querySelector('#cancelWorkoutBtn').onclick=cancelActiveWorkout;
-  panel.querySelector('#finishBtn').onclick=openFinish;
+  panel.querySelector('#finishBtn').onclick=()=>completeActiveWorkout();
 }
 function setDelta(first,last){
   if(!first||!last) return {cls:'flat',arrow:'—',label:'—',rank:0};
@@ -243,10 +259,12 @@ function setDelta(first,last){
    The prefilled reps/kg always REPEAT the last set (realistic — no auto jump in weight).
    Progression is shown only as a text hint the lifter can choose to act on. */
 function suggest(ex){
-  const all=allSetsFor(ex.id);
+  const locationId=currentActiveWorkout()?.locationId||'home';
+  const variant=variantOf(ex);
+  const all=allSetsFor(ex.id).filter(s=>(s.locationId||'home')===locationId && (s.variant||variantOf(ex))===variant);
   if(!all.length) return {reps:ex.low, kg:0, up:false,
     tip:`New — aim ${ex.low}–${ex.high} reps`,
-    msg:`First time — find a weight you can do for ${ex.low}–${ex.high} reps`};
+    msg:`First time at ${esc(locationName(locationId))} with ${variant.toLowerCase()} equipment — find a weight you can do for ${ex.low}–${ex.high} reps`};
   const last=all[all.length-1];
   const nextKg=Math.round((last.kg+ex.inc)*4)/4;
   if(last.reps>=ex.high){
@@ -292,5 +310,5 @@ function closeSheets(){
   document.body.classList.remove('sheet-open');
   document.querySelectorAll('.sheet').forEach(s=>{ s.classList.remove('show'); setSheetHidden(s,true); });
 }
-bg.onclick=closeSheets;
+bg.onclick=()=>{ if(!document.getElementById('recoverySheet').classList.contains('show')) closeSheets(); };
 closeSheets();

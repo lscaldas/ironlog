@@ -3,7 +3,8 @@
 function esc(s){ return (s||"").replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
 function normalizeDB(){
   let dirty=false;
-  if(DB.schemaVersion!==4){ DB.schemaVersion=4; dirty=true; }
+  if(DB.schemaVersion!==5){ DB.schemaVersion=5; dirty=true; }
+  if(!Array.isArray(DB.gyms)){ DB.gyms=[]; dirty=true; }
   if(DB.initialized!==true && (DB.exercises?.length||DB.sets?.length)){ DB.initialized=true; dirty=true; }
   if(!Array.isArray(DB.exercises)){ DB.exercises=[]; dirty=true; }
   if(!Array.isArray(DB.sets)){ DB.sets=[]; dirty=true; }
@@ -77,6 +78,7 @@ function normalizeDB(){
     if(!e.low){ e.low=8; dirty=true; }
     if(!e.high){ e.high=12; dirty=true; }
     if(!e.inc){ e.inc=2.5; dirty=true; }
+    if(!EQUIPMENT_VARIANTS.includes(e.variant)){ e.variant=variantOf(e); dirty=true; }
   });
   DB.sets.forEach(s=>{
     if(!s.id){ s.id=uid('s'); dirty=true; }
@@ -84,6 +86,8 @@ function normalizeDB(){
     if(!Number.isFinite(s.ts)){ s.ts=new Date(s.date+"T12:00:00").getTime(); dirty=true; }
     if(typeof s.kg!=='number'){ s.kg=parseFloat(s.kg)||0; dirty=true; }
     if(typeof s.reps!=='number'){ s.reps=parseInt(s.reps)||1; dirty=true; }
+    if(!s.locationId){ s.locationId='home'; dirty=true; }
+    if(!EQUIPMENT_VARIANTS.includes(s.variant)){ s.variant=variantOf(DB.exercises.find(e=>e.id===s.exId)||{}); dirty=true; }
   });
   const setIds=new Set(DB.sets.map(s=>s.id));
   const seenWorkouts=new Set();
@@ -98,12 +102,14 @@ function normalizeDB(){
     if(!w.startedAt){ w.startedAt=w.setIds.map(id=>DB.sets.find(s=>s.id===id)?.ts).filter(Boolean).sort()[0]||Date.now(); dirty=true; }
     if(!w.endedAt){ w.endedAt=w.startedAt; dirty=true; }
     if(!w.date){ w.date=dateKey(new Date(w.startedAt)); dirty=true; }
+    if(!w.locationId){ w.locationId='home'; dirty=true; }
     return true;
   });
   if(DB.activeWorkout){
     if(!DB.activeWorkout.id){ DB.activeWorkout.id=uid('w'); dirty=true; }
     if(!DB.activeWorkout.startedAt){ DB.activeWorkout.startedAt=Date.now(); dirty=true; }
     if(!DB.activeWorkout.date){ DB.activeWorkout.date=dateKey(new Date(DB.activeWorkout.startedAt)); dirty=true; }
+    if(!DB.activeWorkout.locationId){ DB.activeWorkout.locationId='home'; dirty=true; }
     if(!Array.isArray(DB.activeWorkout.setIds)){ DB.activeWorkout.setIds=[]; dirty=true; }
     const activeIds=DB.sets.filter(s=>s.workoutId===DB.activeWorkout.id).map(s=>s.id);
     const merged=[...new Set(DB.activeWorkout.setIds.concat(activeIds).filter(id=>setIds.has(id)))];
@@ -121,8 +127,18 @@ renderCatalog();
 updateCloudUI();
 if(AUTH_SESSION) hideProfileGate(); else showProfileGate();
 
+// A hidden page or closed app ends a session at the last observable time.
+function saveWorkoutOnLeave(){
+  const w=currentActiveWorkout();
+  if(!w) return;
+  if(document.getElementById('recoverySheet').classList.contains('show')) return;
+  completeActiveWorkout(Date.now(),true);
+}
+document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='hidden') saveWorkoutOnLeave(); });
+window.addEventListener('pagehide',saveWorkoutOnLeave);
+
 if('serviceWorker' in navigator){
   window.addEventListener('load',()=>{
-    navigator.serviceWorker.register('./sw.js?v=31').then(reg=>reg.update()).catch(()=>{});
+    navigator.serviceWorker.register('./sw.js?v=33').then(reg=>reg.update()).catch(()=>{});
   });
 }

@@ -112,7 +112,7 @@ async function openFirstLogSheet(page) {
   const logButtons = page.locator('button[title="Log set"]');
   await expect(logButtons.first()).toBeVisible();
   await logButtons.first().click();
-  await expect(page.getByRole('button', { name: /Log this set/i })).toBeVisible();
+  await expect(page.getByRole('button', { name: /Log & move to the next/i })).toBeVisible();
 }
 
 function repsInput(page) {
@@ -131,7 +131,7 @@ async function fillSet(page, reps = '10', weight = '12.5') {
 async function logOneSet(page, reps = '10', weight = '12.5') {
   await openFirstLogSheet(page);
   await fillSet(page, reps, weight);
-  await page.getByRole('button', { name: /Log this set/i }).click();
+  await page.getByRole('button', { name: /Log & move to the next/i }).click();
   await expect(loggedSetChips(page)).toHaveCount(1);
 }
 
@@ -156,11 +156,7 @@ async function finishWorkoutThroughExpectedFlow(page) {
     await page.getByRole('button', { name: /Finish.*workout/i }).first().click();
   }
 
-  const save = page.getByRole('button', { name: /^Save completed workout$/i });
-  await expect.soft(save, 'AC-B002-1: finish review primary CTA should be Save completed workout').toBeVisible();
-  if (!(await clickIfVisible(save))) {
-    await clickIfVisible(page.getByRole('button', { name: /^Done/i }));
-  }
+  await expect.soft(page.getByRole('button', { name: /^Start workout$/i }), 'AC-B002-1: finishing saves immediately').toBeVisible();
 }
 
 async function prepareCurrentWorkoutData(page, testInfo, suffix = '') {
@@ -220,11 +216,11 @@ test('SMK-02 log a set, block duplicate submission, and persist after reload', a
 
   await openFirstLogSheet(page);
   await fillSet(page);
-  await page.getByRole('button', { name: /Log this set/i }).dblclick();
+  await page.getByRole('button', { name: /Log & move to the next/i }).dblclick();
 
   await expect.soft(
     loggedSetChips(page),
-    'AC-B003-1 / AC-B003-3: rapid repeated Log this set activation should create at most one visible set',
+    'AC-B003-1 / AC-B003-3: rapid repeated Log & move to the next activation should create at most one visible set',
   ).toHaveCount(1);
   await expect.soft(
     page.getByText(/10\s*[×x]\s*12\.5\s*kg/i).first(),

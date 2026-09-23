@@ -12,7 +12,7 @@
 <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="icons/icon.svg">
 <title>IronLog — Weekly Sets</title>
-<link rel="stylesheet" href="styles.css?v=31">
+<link rel="stylesheet" href="styles.css?v=33">
 </head>
 <body>
 <div class="gate" id="profileGate">
@@ -39,6 +39,7 @@
   <!-- ===== WEEK ===== -->
   <section class="view active" id="v-week">
     <div class="workout-panel" id="workoutPanel"></div>
+    <div id="restBanner" class="rest-banner" hidden></div>
 
     <div class="card loadout-card" id="weekSetup" hidden>
       <div class="loadout-head">
@@ -72,8 +73,8 @@
     <div id="weekList"></div>
     <button class="ghost" id="addExBtn" style="width:100%;margin:6px 0 4px;">＋ Add exercise to program</button>
     <div class="empty" id="weekEmpty" style="display:none;">
-      <div class="big">📋</div><div>No exercises in your program yet.</div>
-      <div style="font-size:12px;margin-top:4px;">Add one above, or load the sample program from ⋯.</div>
+      <div class="big">📋</div><div id="weekEmptyMessage">No exercises in your program yet.</div>
+      <div id="weekEmptyHint" style="font-size:12px;margin-top:4px;">Add one above, or load the sample program from ⋯.</div>
     </div>
   </section>
 
@@ -88,17 +89,25 @@
   <section class="view" id="v-stats">
     <div class="card-h" style="padding:0 4px;margin-bottom:10px;"><h2 style="font-size:17px;">Progress</h2></div>
     <div class="seg" id="rangeSeg">
-      <button data-w="4">4 wk</button><button data-w="8" class="on">8 wk</button>
-      <button data-w="12">12 wk</button><button data-w="999">All</button>
+      <button data-w="4">4 wk</button><button data-w="8">8 wk</button>
+      <button data-w="12">12 wk</button><button data-w="999" class="on">All</button>
     </div>
     <div class="strip">
       <div class="stat a"><div class="n" id="aVol">0</div><div class="l">Set volume</div></div>
       <div class="stat b"><div class="n" id="aSets">0</div><div class="l">Exercises</div></div>
       <div class="stat c"><div class="n" id="aHit">0%</div><div class="l">Maintained</div></div>
     </div>
-    <div class="card">
-      <div class="card-h"><h2>Sets per week</h2><div class="sub" id="targetLineLbl"></div></div>
-      <canvas id="setsChart" height="140"></canvas>
+    <div class="card volume-chart-card">
+      <div class="card-h"><h2>Weekly volume by group</h2></div>
+      <div class="sub">Effective sets each week, including weeks with no training.</div>
+      <div class="chart-scroll"><canvas id="groupsChart" height="210"></canvas></div>
+      <div class="chart-legend" id="groupChartLegend"></div>
+    </div>
+    <div class="card volume-chart-card">
+      <div class="card-h"><h2>Muscle volume</h2><div class="sub">one muscle at a time</div></div>
+      <div class="field"><label for="muscleChartSelect">Muscle</label><select id="muscleChartSelect"></select></div>
+      <div class="chart-scroll"><canvas id="muscleChart" height="220"></canvas></div>
+      <div class="chart-legend"><span><i style="background:#8c76c9"></i>Maintain</span><span><i style="background:#bfa4ff"></i>Build</span><span><i style="background:#f7d78b"></i>Beast</span></div>
     </div>
     <div class="card">
       <div class="card-h"><h2>Best-set progress</h2><div class="sub">weight first, then reps</div></div>
@@ -135,6 +144,7 @@
 <div class="sheet-bg" id="sheetBg"></div>
 <div class="sheet" id="logSheet">
   <div class="grab"></div>
+  <div id="restStatus" class="rest-status" hidden></div>
   <h3 id="logTitle">Log set</h3>
   <p class="h3sub" id="logSub"></p>
   <div class="row" style="margin-bottom:14px;">
@@ -144,17 +154,19 @@
       <div class="step"><button data-t="kg" data-d="-1">−</button><input id="inKg" type="number" inputmode="decimal" step="0.5"><button data-t="kg" data-d="1">＋</button></div></div>
   </div>
   <div id="logHint" class="sugg" style="margin-bottom:14px;"></div>
-  <button class="btn" id="saveSetBtn">Log this set ✓</button>
-  <button class="ghost" id="saveSetMoreBtn" style="width:100%;margin-top:9px;">Log &amp; add another</button>
+  <button class="btn" id="saveSetBtn">Log &amp; move to the next</button>
+  <button class="ghost" id="saveSetMoreBtn" style="width:100%;margin-top:9px;">Log &amp; add another set</button>
+  <button class="ghost" id="restBarsBtn" type="button" style="width:100%;margin-top:9px;">See muscle bars while resting</button>
 </div>
 
-<!-- Finish workout sheet -->
-<div class="sheet" id="finSheet">
+<!-- Recovery for sessions that were left active on an earlier launch -->
+<div class="sheet" id="recoverySheet">
   <div class="grab"></div>
-  <h3>Finish workout</h3>
-  <p class="h3sub" id="finSub"></p>
-  <div id="finBody"></div>
-  <button class="btn" id="finDoneBtn" style="margin-top:8px;">Save completed workout</button>
+  <h3>Forgot to stop a workout?</h3>
+  <p class="h3sub" id="recoverySub"></p>
+  <div class="field"><label for="recoveryMinutes">Estimated duration (minutes)</label><input id="recoveryMinutes" type="number" min="1" max="1440" inputmode="numeric" value="60"></div>
+  <div class="recovery-options"><button type="button" data-minutes="30">30 min</button><button type="button" data-minutes="60">60 min</button><button type="button" data-minutes="90">90 min</button></div>
+  <button class="btn" id="recoverySaveBtn" type="button">Save workout</button>
 </div>
 
 <!-- Edit exercise sheet -->
@@ -177,6 +189,8 @@
     <div class="choice-help" id="areaHelp"></div>
   </div>
   <div class="field"><label>Exercise name</label><div class="input-combo"><input id="fName" list="exDL" placeholder="Select or type custom" autocomplete="off"><button class="drop-btn" id="exDropBtn" type="button" title="Show more exercise choices">v</button></div><datalist id="exDL"></datalist></div>
+  <div class="field"><label for="fVariant">Equipment variant</label><select id="fVariant"><option value="Free weight">Free weight</option><option value="Cable">Cable</option><option value="Machine">Machine</option><option value="Bodyweight">Bodyweight</option></select></div>
+  <div class="field"><label>Available at</label><div class="location-choices" id="fLocations"></div></div>
   <div class="ex-suggestions" id="exSuggestList"></div>
   <div class="form-hint" id="matchHint"></div>
   <div class="field"><label>My group / split</label><input id="fBucket" list="bkDL" placeholder="Upper"><datalist id="bkDL"></datalist></div>
@@ -208,7 +222,7 @@
       <input id="cloudPin" type="password" inputmode="numeric" autocomplete="current-password" placeholder="PIN for this profile">
     </div>
     <div class="row">
-      <button class="ghost" id="cloudLoadBtn" type="button">Load cloud</button>
+      <button class="ghost" id="cloudLoadBtn" type="button">Merge cloud</button>
       <button class="ghost" id="cloudSaveBtn" type="button">Save cloud</button>
     </div>
     <p class="h3sub" id="cloudHelp" style="margin:10px 0 0;">Cloud sync needs Supabase URL/key in cloud-config.js.</p>
@@ -223,25 +237,32 @@
     </div>
   </div>
   <button class="ghost" id="exportBtn" style="width:100%;margin-bottom:10px;">⬇️ Export data (JSON)</button>
+  <div class="card" id="recoveryCopies" hidden style="box-shadow:none;margin-bottom:10px;">
+    <div class="card-h"><h2>Saved local copies</h2></div>
+    <p class="h3sub">Created before cloud merges on this device. Merge one to recover missing workouts.</p>
+    <div class="field"><label for="recoveryCopySelect">Choose a copy</label><select id="recoveryCopySelect"></select></div>
+    <button class="ghost" id="mergeRecoveryBtn" type="button" style="width:100%;">Merge selected copy</button>
+  </div>
   <button class="ghost" id="importBtn" style="width:100%;margin-bottom:10px;">⬆️ Import data (JSON)</button>
   <input type="file" id="importFile" accept="application/json" style="display:none;">
   <button class="ghost" id="demoBtn" style="width:100%;margin-bottom:10px;">✨ Load my program + sample history</button>
   <button class="ghost" id="seedBtn" style="width:100%;margin-bottom:10px;">📋 Load my program (empty)</button>
   <button class="ghost" id="logoutBtn" style="width:100%;margin-bottom:10px;">Log out</button>
+  <div class="card"><div class="card-h"><h2>Workout locations</h2></div><div id="gymList"></div><div class="row"><input id="gymName" maxlength="80" placeholder="Gym name, e.g. FitX Alexanderplatz"><button class="ghost" id="addGymBtn" type="button">Add</button></div></div>
   <button class="ghost" id="wipeBtn" style="width:100%;color:var(--accent);border-color:var(--accent);">🗑️ Erase all data</button>
 </div>
 
 <div class="toast" id="toast"></div>
 
-<script src="cloud-config.js?v=31"></script>
-<script src="js/storage.js?v=31"></script>
-<script src="js/catalog-data.js?v=31"></script>
-<script src="js/helpers.js?v=31"></script>
-<script src="js/week.js?v=31"></script>
-<script src="js/exercises.js?v=31"></script>
-<script src="js/stats.js?v=31"></script>
-<script src="js/data.js?v=31"></script>
-<script src="js/cloud.js?v=31"></script>
-<script src="js/init.js?v=31"></script>
+<script src="cloud-config.js?v=33"></script>
+<script src="js/storage.js?v=33"></script>
+<script src="js/catalog-data.js?v=33"></script>
+<script src="js/helpers.js?v=33"></script>
+<script src="js/week.js?v=33"></script>
+<script src="js/exercises.js?v=33"></script>
+<script src="js/stats.js?v=33"></script>
+<script src="js/data.js?v=33"></script>
+<script src="js/cloud.js?v=33"></script>
+<script src="js/init.js?v=33"></script>
 </body>
 </html>

@@ -7,6 +7,8 @@ function openEx(e){
   EX_CHOICES_OPEN=false;
   document.getElementById('exTitle').textContent=e?'Edit exercise':'Add exercise';
   document.getElementById('fName').value=e?e.name:'';
+  document.getElementById('fVariant').value=e?variantOf(e):'Free weight';
+  renderExerciseLocations(e);
   document.getElementById('fMuscle').value=e?muscleOf(e):'';
   document.getElementById('fArea').value=e?areaOf(e):'';
   document.getElementById('fBucket').value=e?e.bucket:(DB.exercises[0]?.bucket||'Upper');
@@ -23,6 +25,16 @@ function openEx(e){
 }
 document.getElementById('addExBtn').onclick=()=>openEx(null);
 document.getElementById('cancelExBtn').onclick=closeSheets;
+function renderExerciseLocations(ex){
+  const box=document.getElementById('fLocations');
+  const selected=Array.isArray(ex?.locations)?ex.locations:(ex?null:(currentActiveWorkout()?[currentActiveWorkout().locationId||'home']:null));
+  const options=[{id:'home',name:'Home'},...(DB.gyms||[])];
+  box.innerHTML=`<label><input type="checkbox" value="all" ${selected?'':'checked'}> All locations</label>`+
+    options.map(g=>`<label><input type="checkbox" value="${esc(g.id)}" ${selected?.includes(g.id)?'checked':''} ${selected?'':'disabled'}> ${esc(g.name)}</label>`).join('');
+  box.querySelector('input[value="all"]').onchange=e=>{
+    box.querySelectorAll('input:not([value="all"])').forEach(input=>{ input.disabled=e.target.checked; if(e.target.checked) input.checked=false; });
+  };
+}
 function areaOptionsForMuscle(muscle){
   const current=document.getElementById('fArea').value.trim();
   if(!muscle) return current?[current]:[];
@@ -105,6 +117,7 @@ function renderExerciseChoices(){
 function chooseCatalogExercise(name){
   const entry=catalogEntries().find(x=>normName(x.name)===normName(name))||catalogEntryFromName(name,'Custom');
   document.getElementById('fName').value=entry.name;
+  if(!editEx) document.getElementById('fVariant').value=variantOf(entry);
   document.getElementById('fMuscle').value=entry.muscle;
   document.getElementById('fArea').value=entry.area;
   const bucket=document.getElementById('fBucket');
@@ -149,7 +162,11 @@ document.getElementById('fName').onchange=()=>{
 document.getElementById('exDropBtn').onclick=()=>{ EX_CHOICES_OPEN=!EX_CHOICES_OPEN; renderExerciseChoices(); };
 document.getElementById('saveExBtn').onclick=()=>{
   const name=document.getElementById('fName').value.trim(); if(!name){ toast("Name it"); return; }
-  const obj={ name, muscle:(document.getElementById('fMuscle').value.trim()||guessMuscle(name)||'Other'),
+  const locationBox=document.getElementById('fLocations');
+  const allLocations=locationBox.querySelector('input[value="all"]').checked;
+  const locations=allLocations?null:[...locationBox.querySelectorAll('input:checked')].map(input=>input.value);
+  if(locations&&!locations.length){ toast('Choose a location or All locations'); return; }
+  const obj={ name, variant:document.getElementById('fVariant').value, locations, muscle:(document.getElementById('fMuscle').value.trim()||guessMuscle(name)||'Other'),
     area:(document.getElementById('fArea').value.trim()||guessArea(name)||'Other'),
     bucket:(document.getElementById('fBucket').value.trim()||'Other'),
     low:parseInt(document.getElementById('fLow').value)||8, high:parseInt(document.getElementById('fHigh').value)||12,
@@ -160,7 +177,7 @@ document.getElementById('saveExBtn').onclick=()=>{
 document.getElementById('delExBtn').onclick=()=>{
   if(!editEx)return;
   if(confirm(`Remove "${editEx.name}" from your program? Logged history is kept.`)){
-    DB.exercises=DB.exercises.filter(x=>x.id!==editEx.id); save(); closeSheets(); renderWeek(); toast("Removed");
+    editEx.archived=true; save(); closeSheets(); renderWeek(); toast("Removed from program");
   }
 };
 
@@ -208,7 +225,7 @@ function catalogEntries(){
 function renderCatalog(){
   const q=(document.getElementById('catalogSearch')?.value||'').trim().toLowerCase();
   const matchQ=entry=>!q||catalogSearchText(entry).includes(q);
-  const program=DB.exercises.map(e=>({name:e.name,source:e.bucket||'Program',muscle:muscleOf(e)||'Other',area:areaOf(e)||'Other',match:exerciseMatch(e.name),keys:exerciseMatch(e.name)?.keys||[]})).filter(matchQ);
+  const program=DB.exercises.filter(e=>!e.archived).map(e=>({name:e.name,source:e.bucket||'Program',muscle:muscleOf(e)||'Other',area:areaOf(e)||'Other',match:exerciseMatch(e.name),keys:exerciseMatch(e.name)?.keys||[]})).filter(matchQ);
   const catalog=catalogEntries().filter(matchQ);
   document.getElementById('catalogCount').textContent=`${catalog.length} catalogued`;
   document.getElementById('programMapCount').textContent=`${program.length}`;
@@ -244,7 +261,7 @@ function renderHistory(){
     return `<div class="day session" data-wid="${esc(w.id)}">
       <button class="session-row day-h" type="button" aria-expanded="false" aria-label="${esc(label)}">
         <div><div class="day-date">Completed workout session</div>
-        <div class="day-sum">${relDay(w.date||dateKey(new Date(w.startedAt)))} · duration ${workoutDuration(w.startedAt,w.endedAt||w.startedAt)} · ${sets.length} set${sets.length===1?'':'s'} · ${Object.keys(byEx).length} exercise${Object.keys(byEx).length===1?'':'s'}</div></div><span class="chev">›</span>
+        <div class="day-sum">${relDay(w.date||dateKey(new Date(w.startedAt)))} · ${esc(w.locationName||locationName(w.locationId||'home'))} · duration ${workoutDuration(w.startedAt,w.endedAt||w.startedAt)} · ${sets.length} set${sets.length===1?'':'s'} · ${Object.keys(byEx).length} exercise${Object.keys(byEx).length===1?'':'s'}</div></div><span class="chev">›</span>
       </button>
       <div class="session-actions"><button class="ghost btn-sm deleteWorkoutBtn" type="button">Delete</button></div>
       <div class="day-body">${rows||'<div class="sub">No sets saved in this workout.</div>'}</div>

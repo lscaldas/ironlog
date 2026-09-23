@@ -82,7 +82,7 @@ function renderMuscleBars(mk){
 
 /* ===== Weekly loadout picker — shows once per week, then collapses to a chip row ===== */
 function setupGroupList(){
-  return WEEK_LOADOUT_GROUPS.filter(g=>g.id!=='Other'||DB.exercises.some(ex=>focusGroupForExercise(ex)===g.id));
+  return WEEK_LOADOUT_GROUPS.filter(g=>g.id!=='Other'||DB.exercises.some(ex=>!ex.archived&&focusGroupForExercise(ex)===g.id));
 }
 function renderWeekSetup(mk){
   const card=document.getElementById('weekSetup');
@@ -93,7 +93,7 @@ function renderWeekSetup(mk){
     card.hidden=false; row.hidden=true;
     const active=weekGroupsFor(mk);
     document.getElementById('setupGroups').innerHTML=groups.map(g=>{
-      const count=DB.exercises.filter(ex=>focusGroupForExercise(ex)===g.id).length;
+      const count=DB.exercises.filter(ex=>!ex.archived&&focusGroupForExercise(ex)===g.id).length;
       return `<button type="button" class="setup-chip ${active.includes(g.id)?'on':''}" data-group="${g.id}" aria-pressed="${active.includes(g.id)}">
         <span aria-hidden="true">${g.icon}</span><b>${g.id}</b><small>${g.muscles} · ${count} exercise${count===1?'':'s'}</small></button>`;
     }).join('');
@@ -130,12 +130,17 @@ document.getElementById('setupConfirmBtn').onclick=()=>{
 };
 
 function visibleExercises(mk){
-  return DB.exercises.filter(ex=>isGroupActive(focusGroupForExercise(ex),mk));
+  const locationId=currentActiveWorkout()?.locationId;
+  return DB.exercises.filter(ex=>!ex.archived&&isGroupActive(focusGroupForExercise(ex),mk)&&(!locationId||!Array.isArray(ex.locations)||ex.locations.includes(locationId)));
 }
 
 function renderWeek(){
   const mk=thisWeek();
-  document.getElementById('weekEmpty').style.display=DB.exercises.length?'none':'block';
+  document.getElementById('weekEmpty').style.display=visibleExercises(mk).length?'none':'block';
+  const activeLocation=currentActiveWorkout();
+  const programCount=DB.exercises.filter(e=>!e.archived).length;
+  document.getElementById('weekEmptyMessage').textContent=activeLocation&&programCount?`No exercises available at ${activeLocation.locationName||locationName(activeLocation.locationId)}.`:programCount?'No exercises in this week’s selected groups.':'No exercises in your program yet.';
+  document.getElementById('weekEmptyHint').textContent=activeLocation&&programCount?'Add an exercise here, or edit an exercise’s Available at setting.':programCount?'Change the weekly loadout to show another group.':'Add one above, or load the sample program from ⋯.';
   renderGroupChips();
   renderWeekSetup(mk);
   renderMuscleBars(mk);
@@ -180,7 +185,7 @@ function exCard(e,mk){
   node.innerHTML=`
     <div class="ex-top">
       <div class="ex-main">
-        <div class="exname">${esc(e.name)}</div>
+        <div class="exname">${esc(e.name)}</div><small class="variant-tag">${esc(variantOf(e))}</small>
         <div class="ex-meta"><span class="remain"><b>${done}</b> set${done===1?'':'s'} this week</span></div>
         <div class="contribs"><span class="contrib-note">each set</span>${contribChips}</div>
         <div class="exsub">${tip}</div>
@@ -212,6 +217,26 @@ let logEx=null;
 let editSetId=null;
 let LOG_SUBMITTING=false;
 let LAST_LOG_SIGNATURE={sig:'',at:0};
+let REST_UNTIL=0;
+let REST_INTERVAL=null;
+function updateRestStatus(){
+  const el=document.getElementById('restStatus');
+  const banner=document.getElementById('restBanner');
+  const remaining=Math.max(0,Math.ceil((REST_UNTIL-Date.now())/1000));
+  el.hidden=!remaining;
+  banner.hidden=!remaining;
+  if(remaining){
+    const label=`Rest ${Math.floor(remaining/60)}:${String(remaining%60).padStart(2,'0')}`;
+    el.textContent=`${label} · muscle bars are available below`;
+    banner.textContent=`${label} · tap an exercise to log the next set`;
+  }
+  else if(REST_INTERVAL){ clearInterval(REST_INTERVAL); REST_INTERVAL=null; }
+}
+function clearRestTimer(){
+  REST_UNTIL=0;
+  if(REST_INTERVAL){ clearInterval(REST_INTERVAL); REST_INTERVAL=null; }
+  updateRestStatus();
+}
 function setLogButtonsBusy(busy){
   LOG_SUBMITTING=busy;
   document.getElementById('saveSetBtn').disabled=busy;
@@ -222,8 +247,10 @@ function openLog(e){
   renderWorkoutPanel();
   setLogButtonsBusy(false);
   editSetId=null;
-  document.getElementById('saveSetBtn').textContent='Log this set';
+  document.getElementById('saveSetBtn').textContent='Log & move to the next';
   document.getElementById('saveSetMoreBtn').hidden=false;
+  document.getElementById('restBarsBtn').hidden=false;
+  updateRestStatus();
   logEx=e; const sg=suggest(e);
   document.getElementById('logTitle').textContent=e.name;
   const sets=setsFor(e.id,thisWeek()).length;
@@ -233,6 +260,7 @@ function openLog(e){
   const hint=document.getElementById('logHint'); hint.className='sugg '+(sg.up?'up':''); hint.innerHTML=`<span class="ic">💡</span><span class="m">${sg.msg}</span>`;
   openSheet('logSheet');
 }
+function exerciseById(id){ return DB.exercises.find(e=>e.id===id); }
 function openSetEdit(set){
   const e=exerciseById(set.exId);
   if(!e){ toast("Exercise missing"); return; }
@@ -241,6 +269,8 @@ function openSetEdit(set){
   editSetId=set.id;
   document.getElementById('saveSetBtn').textContent='Save set';
   document.getElementById('saveSetMoreBtn').hidden=true;
+  document.getElementById('restBarsBtn').hidden=true;
+  document.getElementById('restStatus').hidden=true;
   document.getElementById('logTitle').textContent='Edit set';
   document.getElementById('logSub').textContent=e.name;
   document.getElementById('inReps').value=set.reps;
@@ -281,7 +311,7 @@ function doLog(){
   }
   setLogButtonsBusy(true);
   const d=todayKey();
-  const set={id:uid('s'),workoutId:w.id,exId:logEx.id,date:d,ts:now,reps,kg};
+  const set={id:uid('s'),workoutId:w.id,exId:logEx.id,date:d,ts:now,reps,kg,locationId:w.locationId||'home',variant:variantOf(logEx)};
   DB.sets.push(set);
   w.setIds=[...new Set((w.setIds||[]).concat(set.id))];
   LAST_LOG_SIGNATURE={sig,at:now};
@@ -325,75 +355,61 @@ document.getElementById('saveSetMoreBtn').onclick=()=>{
   const e=logEx;
   const before=e?muscleEffective(thisWeek()):null;
   if(doLog()){
+    REST_UNTIL=Date.now()+90*1000;
+    if(REST_INTERVAL) clearInterval(REST_INTERVAL);
+    REST_INTERVAL=setInterval(updateRestStatus,1000);
     renderWeek(); openLog(e);
     toast(tierCrossToast(e,thisWeek(),before)||`${contribSummary(e)} ✓`);
   } else setLogButtonsBusy(false);
 };
+document.getElementById('restBarsBtn').onclick=()=>{
+  closeSheets();
+  document.getElementById('mbalCard').scrollIntoView({behavior:'smooth',block:'start'});
+  toast('Rest timer continues · tap + to log another set');
+};
 
-/* ================= Finish workout ================= */
-function exerciseById(id){ return DB.exercises.find(e=>e.id===id); }
-function openFinish(){
+/* ================= Session recovery and locations ================= */
+function showRecoveryIfNeeded(){
   const w=currentActiveWorkout();
-  if(!w){ toast("Start a workout first"); return; }
-  const d=w.date||todayKey(), mk=thisWeek();
-  const todays=setsForWorkout(w);
-  const byEx={};
-  todays.forEach(s=>{ (byEx[s.exId]=byEx[s.exId]||[]).push(s); });
-  document.getElementById('finSub').textContent=todays.length
-    ? `Workout session · ${todays.length} set${todays.length===1?'':'s'} · ${Object.keys(byEx).length} exercise${Object.keys(byEx).length===1?'':'s'}`
-    : `Workout session · no sets logged yet`;
-  document.getElementById('finDoneBtn').disabled=false;
-
-  const rows=Object.entries(byEx).map(([id,sets])=>{
-    const e=exerciseById(id), name=e?e.name:'(removed)';
-    const setTxt=sets.map(s=>`${s.reps}×${fmtW(s.kg)}`).join('  ·  ');
-    return `<div class="day-ex"><div class="nm">${esc(name)} <span style="color:var(--dim);font-weight:400">· ${sets.length} set${sets.length>1?'s':''}</span></div>
-      <div class="st">${setTxt}</div></div>`;
-  }).join('');
-
-  const byMuscle={};
-  todays.forEach(s=>{
-    const e=exerciseById(s.exId);
-    const m=e?(muscleOf(e)||'Other'):'Other';
-    byMuscle[m]=(byMuscle[m]||0)+1;
-  });
-  const muscleChips=Object.entries(byMuscle).sort((a,b)=>b[1]-a[1]).map(([m,c])=>
-    `<span class="wkchip">${esc(m)} <b>${c}</b></span>`).join('');
-
-  const remaining=Object.values(muscleEffective(mk)).filter(r=>r.inProgram).map(r=>{
-    const st=muscleBarState(r.eff,r.muscle);
-    return {m:r.muscle,left:st.next===null?0:Math.max(0,st.next-r.eff),icon:st.next===null?'':BAR_TIERS[st.cleared].icon};
-  }).filter(r=>r.left>0).sort((a,b)=>b.left-a.left);
-  const remTxt=remaining.length
-    ? remaining.slice(0,6).map(r=>`<span class="wkchip">${esc(r.m)} <b>${fmtEff(r.left)}</b> to ${r.icon}</span>`).join('')
-    : `<span class="wkchip best">every bar maxed 🔥</span>`;
-
-  const byArea={};
-  todays.forEach(s=>{
-    const e=exerciseById(s.exId);
-    const area=e?(areaOf(e)||'Other'):'Other';
-    byArea[area]=(byArea[area]||0)+1;
-  });
-  const areaChips=Object.entries(byArea).sort((a,b)=>b[1]-a[1]).map(([a,c])=>
-    `<span class="wkchip">${esc(a)} <b>${c}</b></span>`).join('');
-
-  document.getElementById('finBody').innerHTML=`
-    <div class="card" style="box-shadow:none;margin-bottom:10px;">
-      <div class="card-h"><h2>${relDay(d)}</h2><div class="sub">${todays.length?'logged sets':'nothing logged'}</div></div>
-      ${rows||'<div class="sub">Log a set first, then come back here to close out the session.</div>'}
-    </div>
-    <div class="card" style="box-shadow:none;margin-bottom:10px;">
-      <div class="card-h"><h2>Muscles hit today</h2></div>
-      <div class="finchips">${muscleChips||'<span class="sub">No muscle groups yet.</span>'}</div>
-    </div>
-    <div class="card" style="box-shadow:none;margin-bottom:10px;">
-      <div class="card-h"><h2>Areas hit today</h2></div>
-      <div class="finchips">${areaChips||'<span class="sub">No areas yet.</span>'}</div>
-    </div>
-    <div class="card" style="box-shadow:none;margin-bottom:0;">
-      <div class="card-h"><h2>Still left this week</h2></div>
-      <div class="finchips">${remTxt}</div>
-    </div>`;
-  openSheet('finSheet');
+  if(!w || document.getElementById('profileGate').classList.contains('hide')===false) return;
+  const elapsed=Math.max(1,Math.floor((Date.now()-w.startedAt)/60000));
+  const estimate=Math.min(60,elapsed);
+  document.getElementById('recoveryMinutes').value=estimate;
+  document.getElementById('recoverySub').textContent=`This workout at ${w.locationName||locationName(w.locationId||'home')} was left active. We estimate ${estimate} min. Choose a different duration if needed.`;
+  openSheet('recoverySheet');
 }
-document.getElementById('finDoneBtn').onclick=completeActiveWorkout;
+document.querySelectorAll('#recoverySheet [data-minutes]').forEach(btn=>btn.onclick=()=>{
+  document.getElementById('recoveryMinutes').value=btn.dataset.minutes;
+});
+document.getElementById('recoverySaveBtn').onclick=()=>{
+  const w=currentActiveWorkout();
+  if(!w){ closeSheets(); return; }
+  const minutes=Number(document.getElementById('recoveryMinutes').value);
+  if(!Number.isInteger(minutes)||minutes<1||minutes>1440){ toast('Choose 1–1440 minutes'); return; }
+  if(!setsForWorkout(w).length){ DB.activeWorkout=null; save(); closeSheets(); refreshAll(); toast('Empty workout closed'); return; }
+  completeActiveWorkout(Math.min(Date.now(),w.startedAt+minutes*60000));
+};
+function renderGymList(){
+  const list=document.getElementById('gymList');
+  list.innerHTML=(DB.gyms||[]).length?DB.gyms.map(g=>`<div class="gym-row"><span>${esc(g.name)}</span><button type="button" data-id="${esc(g.id)}" aria-label="Delete ${esc(g.name)}">Delete</button></div>`).join(''):'<p class="sub">Home is always available. Add gyms for separate weight history.</p>';
+  list.querySelectorAll('button').forEach(btn=>btn.onclick=()=>{
+    const id=btn.dataset.id;
+    if(!confirm(`Delete ${locationName(id)}? Past workouts keep their location label in history.`)) return;
+    if(DB.activeWorkout?.locationId===id) DB.activeWorkout.locationName=locationName(id);
+    DB.workouts.filter(w=>w.locationId===id).forEach(w=>{w.locationName=w.locationName||locationName(id);});
+    DB.gyms=DB.gyms.filter(g=>g.id!==id);
+    save(); renderGymList(); renderWeek();
+  });
+}
+document.getElementById('addGymBtn').onclick=()=>{
+  const input=document.getElementById('gymName');
+  const name=input.value.trim();
+  if(!name){ toast('Enter a gym name'); return; }
+  if(name.toLowerCase()==='home'){ toast('Home is already available'); return; }
+  if((DB.gyms||[]).some(g=>g.name.toLowerCase()===name.toLowerCase())){ toast('Gym already added'); return; }
+  DB.gyms.push({id:uid('g'),name}); input.value=''; save(); renderGymList(); renderWeek();
+};
+document.getElementById('menuBtn').addEventListener('click',renderGymList);
+document.getElementById('profilePill').addEventListener('click',renderGymList);
+
+/* Workout completion is handled directly by the Finish workout button. */

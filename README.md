@@ -15,6 +15,14 @@ The Week screen is driven by effective-set progress for each muscle, not per-exe
 
 The weekly selection is stored by Monday date, survives reload/export/cloud sync, and carries forward as the next week's default. The picker disappears after confirmation and can be reopened with **Change**.
 
+## Workouts and locations
+
+- Choose **Home** or a saved gym before starting. Manage gym names in **Data & backup**.
+- Each exercise has an equipment variant and optional **Available at** locations. A new exercise added during a workout defaults to that location; existing exercises remain available everywhere until edited.
+- Previous weights are suggested only for the same exercise, equipment variant, and location.
+- **Finish workout** saves immediately. Moving away from the app or closing it saves any active workout with logged sets. If an older active workout remains after a crash, the next launch asks for its duration and suggests 60 minutes when enough time has elapsed.
+- **Progress** shows weekly effective set volume for Legs, Core, Push, and Pull, plus one selected muscle with Maintain, Build, and Beast threshold lines. Weeks without sets appear as zero.
+
 ## Data model
 
 Workout data is private to each browser/device and is stored in `localStorage` under `ironlog.v2`.
@@ -66,7 +74,7 @@ window.IRONLOG_CLOUD = {
 
 7. Commit and push the update.
 
-In the app, enter a profile name and PIN on the first screen. If the encrypted cloud profile already exists, it loads. If it does not exist, the app creates it from the current local program. After a profile is unlocked, normal changes auto-save encrypted to cloud.
+In the app, enter a profile name and PIN on the first screen. If the encrypted cloud profile already exists, it merges with local workouts by record ID. If it does not exist, the app creates it from the current local program. Before a cloud merge, the app keeps up to five local copies under **Data & backup → Saved local copies**. After a profile is unlocked, changes merge and auto-save encrypted to cloud. Copies live only in this browser; export JSON separately for a backup that survives device loss.
 
 ### GitHub Pages
 

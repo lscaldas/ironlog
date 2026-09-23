@@ -96,7 +96,7 @@ async function openFirstLogSheet(page) {
   const logButtons = page.locator('button[title="Log set"]');
   await expect(logButtons.first()).toBeVisible();
   await logButtons.first().click();
-  await expect(page.getByRole('button', { name: /Log this set/i })).toBeVisible();
+  await expect(page.getByRole('button', { name: /Log & move to the next/i })).toBeVisible();
 }
 
 function repsInput(page) {
@@ -119,7 +119,7 @@ function loggedSetChips(page) {
 async function logOneSet(page, reps = '10', weight = '12.5') {
   await openFirstLogSheet(page);
   await fillSet(page, reps, weight);
-  await page.getByRole('button', { name: /Log this set/i }).click();
+  await page.getByRole('button', { name: /Log & move to the next/i }).click();
   await expect(loggedSetChips(page)).toHaveCount(1);
 }
 
@@ -139,8 +139,6 @@ function statValue(page, label) {
 
 async function finishWorkout(page) {
   await page.getByRole('button', { name: /^Finish workout$/i }).click();
-  await expect(page.getByRole('heading', { name: /^Finish workout$/i })).toBeVisible();
-  await page.getByRole('button', { name: /^Save completed workout$/i }).click();
   await expect(page.getByText(/Workout saved/i)).toBeVisible();
 }
 
@@ -185,9 +183,6 @@ test('T-008 cancelling a workout with sets requires an explicit choice and prese
   await expect(page.getByText(/Workout in progress/i)).toBeVisible();
   await expect(loggedSetChips(page)).toHaveCount(1);
 
-  await page.reload();
-  await expect(loggedSetChips(page)).toHaveCount(1);
-
   const acceptMessage = await cancelWorkout(page, true);
   expect.soft(acceptMessage, 'Confirmed cancellation should use the same explicit data-loss prompt.').toMatch(/delete its logged sets/i);
   await expect(page.getByText(/No active workout/i)).toBeVisible();
@@ -207,7 +202,7 @@ test('T-013 rapid Log and add another activation creates one set and leaves the 
   await page.getByRole('button', { name: /Log & add another/i }).dblclick();
 
   await expect(loggedSetChips(page)).toHaveCount(1);
-  await expect(page.getByRole('button', { name: /Log this set/i })).toBeVisible();
+  await expect(page.getByRole('button', { name: /Log & move to the next/i })).toBeVisible();
   await expect(page.locator('#logSub')).toContainText(/Set 2/i);
 
   await page.reload();
@@ -222,7 +217,7 @@ test('T-014 invalid reps are rejected without creating sets', async ({ page }, t
 
   for (const reps of ['0', '-1', '3.5', '1e2', '', '1000']) {
     await fillSet(page, reps, '12.5');
-    await page.getByRole('button', { name: /Log this set/i }).click();
+    await page.getByRole('button', { name: /Log & move to the next/i }).click();
     await expect(page.locator('#logSheet')).toHaveClass(/show/);
     await expect(page.locator('#toast')).toContainText(/Reps must/i);
     await expect(loggedSetChips(page), `Invalid reps "${reps}" should not create a visible set.`).toHaveCount(0);
@@ -240,7 +235,7 @@ test('T-015 invalid weights are rejected without creating sets', async ({ page }
 
   for (const weight of ['-20', '1e3', '12.345', '1000']) {
     await fillSet(page, '10', weight);
-    await page.getByRole('button', { name: /Log this set/i }).click();
+    await page.getByRole('button', { name: /Log & move to the next/i }).click();
     await expect(page.locator('#logSheet')).toHaveClass(/show/);
     await expect(page.locator('#toast')).toContainText(/Weight must/i);
     await expect(loggedSetChips(page), `Invalid weight "${weight}" should not create a visible set.`).toHaveCount(0);
@@ -310,7 +305,7 @@ test('muscle bars stack tier lives, stay central, and exercises show per-set con
   for (let i = 0; i < 4; i += 1) {
     await pullups.locator('button[title="Log set"]').click();
     await fillSet(page, String(8 + i), '0');
-    await page.getByRole('button', { name: /Log this set/i }).click();
+    await page.getByRole('button', { name: /Log & move to the next/i }).click();
     await expect(pullups.locator('.wkchip')).toHaveCount(Math.min(i + 1, 3));
   }
 
@@ -330,7 +325,7 @@ test('T-020 visible set removal recalculates statistics after reload', async ({ 
   await fillSet(page, '10', '12.5');
   await page.getByRole('button', { name: /Log & add another/i }).click();
   await fillSet(page, '9', '15');
-  await page.getByRole('button', { name: /Log this set/i }).click();
+  await page.getByRole('button', { name: /Log & move to the next/i }).click();
   await expect(loggedSetChips(page)).toHaveCount(2);
 
   await openStats(page);
@@ -451,7 +446,7 @@ test('exercise cards can adopt an inferred name and show only the three latest s
   for (let reps = 8; reps <= 11; reps += 1) {
     await card.locator('button[title="Log set"]').click();
     await fillSet(page, String(reps), '20');
-    await page.getByRole('button', { name: /Log this set/i }).click();
+    await page.getByRole('button', { name: /Log & move to the next/i }).click();
   }
 
   await expect(card.locator('.wkchip')).toHaveCount(3);
@@ -595,7 +590,7 @@ test('mobile logging sheet keeps primary action visible and unobscured by toast'
   await openLocalProfile(page, name);
   await openFirstLogSheet(page);
 
-  const primary = page.getByRole('button', { name: /Log this set/i });
+  const primary = page.getByRole('button', { name: /Log & move to the next/i });
   await expect(primary).toBeVisible();
   await expect(primary).toBeInViewport();
 

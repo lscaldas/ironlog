@@ -5,6 +5,7 @@ const KEY_PREFIX="ironlog.v2.";
 const PROFILE_KEY="ironlog.profile";
 const SESSION_KEY="ironlog.session";
 const SESSION_TTL_MS=1000*60*60*24*30;
+const RECOVERY_PREFIX='ironlog.recovery.';
 function sanitizeProfileId(s){
   return (s||'').toLowerCase().trim()
     .replace(/[^a-z0-9_-]+/g,'-')
@@ -12,7 +13,7 @@ function sanitizeProfileId(s){
     .slice(0,32);
 }
 function blankDB(){
-  return {schemaVersion:4,initialized:false,exercises:[],sets:[],workouts:[],activeWorkout:null,weekPlans:{}};
+  return {schemaVersion:5,initialized:false,exercises:[],sets:[],workouts:[],activeWorkout:null,weekPlans:{},gyms:[]};
 }
 function profileKeyFor(profile){ return KEY_PREFIX+profile; }
 function profileKey(){ return profileKeyFor(ACTIVE_PROFILE); }
@@ -48,10 +49,22 @@ function load(profile=ACTIVE_PROFILE){
   return blankDB();
 }
 function save(){
-  DB.schemaVersion=4;
+  DB.schemaVersion=5;
   DB.initialized=true;
   localStorage.setItem(profileKey(),JSON.stringify(DB));
   queueCloudSave();
+}
+function recoveryCopyKeys(profile=ACTIVE_PROFILE){
+  const prefix=RECOVERY_PREFIX+profile+'.';
+  return Object.keys(localStorage).filter(key=>key.startsWith(prefix)).sort().reverse();
+}
+function saveRecoveryCopy(profile=ACTIVE_PROFILE){
+  const raw=localStorage.getItem(profileKeyFor(profile))||(profile==='lucas'?localStorage.getItem(LEGACY_KEY):null);
+  if(!raw) return null;
+  const key=RECOVERY_PREFIX+profile+'.'+Date.now()+'.'+Math.random().toString(36).slice(2,6);
+  localStorage.setItem(key,raw);
+  recoveryCopyKeys(profile).slice(5).forEach(oldKey=>localStorage.removeItem(oldKey));
+  return key;
 }
 function rememberSession(mode='local'){
   localStorage.setItem(PROFILE_KEY,ACTIVE_PROFILE);

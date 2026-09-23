@@ -73,7 +73,57 @@ async function supabaseRequest(path,opts={}){
   const text=await res.text();
   return text ? JSON.parse(text) : null;
 }
+function starterExerciseKey(ex){
+  if(!ex||typeof ex.name!=='string'||(Array.isArray(ex.locations)&&ex.locations.length)) return '';
+  if(!SEED.some(seed=>normName(seed.name)===normName(ex.name))) return '';
+  return normName(ex.name)+'|'+variantOf(ex);
+}
+function mergeProfileData(local,remote){
+  const localGyms=Array.isArray(local.gyms)?local.gyms:[];
+  const remoteGyms=Array.isArray(remote.gyms)?remote.gyms:[];
+  const gyms=remoteGyms.map(g=>({...g}));
+  const gymIds=new Map(gyms.map(g=>[g.id,g]));
+  const gymAliases=new Map();
+  localGyms.forEach(g=>{
+    const same=gymIds.get(g.id)||gyms.find(other=>other.name.toLowerCase()===g.name.toLowerCase());
+    if(same){ gymAliases.set(g.id,same.id); Object.assign(same,g,{id:same.id}); }
+    else { gyms.push({...g}); gymIds.set(g.id,g); }
+  });
+  const mapGym=id=>gymAliases.get(id)||id;
+  const exercises=(Array.isArray(remote.exercises)?remote.exercises:[]).map(ex=>({...ex}));
+  const exerciseIds=new Map(exercises.map(ex=>[ex.id,ex]));
+  const exerciseAliases=new Map();
+  (Array.isArray(local.exercises)?local.exercises:[]).forEach(ex=>{
+    const key=starterExerciseKey(ex);
+    const same=exerciseIds.get(ex.id)||(key?exercises.find(other=>starterExerciseKey(other)===key):null);
+    const mapped={...ex,locations:Array.isArray(ex.locations)?ex.locations.map(mapGym):ex.locations};
+    if(same){ exerciseAliases.set(ex.id,same.id); Object.assign(same,mapped,{id:same.id}); }
+    else { exercises.push(mapped); exerciseIds.set(ex.id,mapped); }
+  });
+  const sets=(Array.isArray(remote.sets)?remote.sets:[]).map(set=>({...set}));
+  const setIds=new Map(sets.map((set,index)=>[set.id,index]));
+  (Array.isArray(local.sets)?local.sets:[]).forEach(set=>{
+    const mapped={...set,exId:exerciseAliases.get(set.exId)||set.exId,locationId:mapGym(set.locationId)};
+    const index=setIds.get(set.id);
+    if(index!==undefined) sets[index]=mapped;
+    else { setIds.set(set.id,sets.length); sets.push(mapped); }
+  });
+  const workouts=(Array.isArray(remote.workouts)?remote.workouts:[]).map(w=>({...w,setIds:[...(w.setIds||[])]}));
+  const workoutIds=new Map(workouts.map((w,index)=>[w.id,index]));
+  (Array.isArray(local.workouts)?local.workouts:[]).forEach(w=>{
+    const index=workoutIds.get(w.id);
+    const previous=index===undefined?null:workouts[index];
+    const mapped={...w,locationId:mapGym(w.locationId),setIds:[...new Set([...(previous?.setIds||[]),...(w.setIds||[])])]};
+    if(index!==undefined) workouts[index]=mapped;
+    else { workoutIds.set(w.id,workouts.length); workouts.push(mapped); }
+  });
+  const active=local.activeWorkout||remote.activeWorkout;
+  const activeWorkout=active&&!workoutIds.has(active.id)?{...active,locationId:mapGym(active.locationId),setIds:[...(active.setIds||[])]}:null;
+  return {...remote,...local,initialized:true,schemaVersion:5,gyms,exercises,sets,workouts,activeWorkout,
+    weekPlans:{...(remote.weekPlans||{}),...(local.weekPlans||{})}};
+}
 async function loadCloudProfile(opts={}){
+  const profile=ACTIVE_PROFILE;
   const pin=(opts.pin||document.getElementById('cloudPin').value).trim();
   if(!cloudReady()){ toast("Cloud not configured"); updateCloudUI(); return; }
   if(!pin){ toast("Enter profile PIN"); return; }
@@ -82,17 +132,23 @@ async function loadCloudProfile(opts={}){
     const rows=await supabaseRequest(`${CLOUD_TABLE}?profile_id=eq.${encodeURIComponent(ACTIVE_PROFILE)}&select=data,updated_at`);
     if(!rows.length||!rows[0].data||!rows[0].data.cipher){
       CLOUD.pin=pin; CLOUD.unlocked=true;
-      await saveCloudProfile(true);
+      if(!await saveCloudProfile(true)){ CLOUD.unlocked=false; updateCloudUI(); return false; }
       toast("Cloud profile created");
       if(opts.fromGate){ rememberSession('cloud'); hideProfileGate(); }
       return true;
     }
-    DB=await decryptProfile(rows[0].data,pin);
+    if(ACTIVE_PROFILE!==profile) return false;
+    const remote=await decryptProfile(rows[0].data,pin);
+    if(ACTIVE_PROFILE!==profile) return false;
+    try{ saveRecoveryCopy(profile); }
+    catch(_){ toast('Could not back up local data. Export it before loading cloud.'); updateCloudUI(); return false; }
+    const localSetCount=DB.sets.length;
+    DB=mergeProfileData(DB,remote);
     CLOUD.pin=pin; CLOUD.unlocked=true;
     normalizeDB();
     save();
     refreshAll();
-    toast("Cloud loaded");
+    toast(`Cloud merged · ${DB.sets.length} sets (${localSetCount} local)`);
     if(opts.fromGate){ rememberSession('cloud'); hideProfileGate(); }
     updateCloudUI();
     return true;
@@ -104,26 +160,42 @@ async function loadCloudProfile(opts={}){
   return false;
 }
 async function saveCloudProfile(manual=false){
+  const profile=ACTIVE_PROFILE;
   const pin=(CLOUD.pin||document.getElementById('cloudPin').value||'').trim();
   if(!cloudReady()){ if(manual) toast("Cloud not configured"); updateCloudUI(); return; }
   if(!pin){ if(manual) toast("Enter profile PIN"); return; }
-  if(CLOUD.saving){ CLOUD.pending=true; return; }
+  if(CLOUD.saving){ CLOUD.pending=true; return false; }
   CLOUD.saving=true;
   setCloudState("Saving...");
   try{
-    const data=await encryptProfile(pin);
+    const rows=await supabaseRequest(`${CLOUD_TABLE}?profile_id=eq.${encodeURIComponent(profile)}&select=data,updated_at`);
+    if(ACTIVE_PROFILE!==profile) return false;
+    const remote=rows.length&&rows[0].data?.cipher ? await decryptProfile(rows[0].data,pin) : null;
+    if(ACTIVE_PROFILE!==profile) return false;
+    const merged=remote ? mergeProfileData(DB,remote) : DB;
+    const data=await encryptProfile(pin,merged);
+    if(ACTIVE_PROFILE!==profile) return false;
     await supabaseRequest(`${CLOUD_TABLE}?on_conflict=profile_id`,{
       method:'POST',
       headers:{Prefer:'resolution=merge-duplicates'},
-      body:JSON.stringify([{profile_id:ACTIVE_PROFILE,data}])
+      body:JSON.stringify([{profile_id:profile,data}])
     });
+    if(ACTIVE_PROFILE!==profile) return false;
+    if(remote && JSON.stringify(merged)!==JSON.stringify(DB)){
+      DB=mergeProfileData(DB,merged);
+      normalizeDB();
+      localStorage.setItem(profileKey(),JSON.stringify(DB));
+      refreshAll();
+    }
     CLOUD.pin=pin; CLOUD.unlocked=true; CLOUD.lastSaved=new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
     CLOUD.syncError=false;
-    if(manual) toast("Cloud saved");
+    if(manual) toast("Cloud merged and saved");
+    return true;
   }catch(err){
     CLOUD.syncError=true;
     if(manual) toast("Cloud save failed");
     else queueCloudSave(30000);
+    return false;
   }finally{
     CLOUD.saving=false;
     updateCloudUI();
@@ -131,6 +203,7 @@ async function saveCloudProfile(manual=false){
   }
 }
 async function changeCloudPin(){
+  const profile=ACTIVE_PROFILE;
   const oldPin=document.getElementById('oldCloudPin').value.trim();
   const newPin=document.getElementById('newCloudPin').value.trim();
   const msg=document.getElementById('pinChangeMsg');
@@ -149,19 +222,22 @@ async function changeCloudPin(){
       return;
     }
     const cloudDb=await decryptProfile(rows[0].data,oldPin);
-    const dbForNewPin=(CLOUD.unlocked&&CLOUD.pin===oldPin)?DB:cloudDb;
+    if(ACTIVE_PROFILE!==profile) return;
+    const dbForNewPin=mergeProfileData(DB,cloudDb);
     msg.textContent="Saving with new PIN...";
     const data=await encryptProfile(newPin,dbForNewPin);
+    if(ACTIVE_PROFILE!==profile) return;
     await supabaseRequest(`${CLOUD_TABLE}?on_conflict=profile_id`,{
       method:'POST',
       headers:{Prefer:'resolution=merge-duplicates'},
-      body:JSON.stringify([{profile_id:ACTIVE_PROFILE,data}])
+      body:JSON.stringify([{profile_id:profile,data}])
     });
+    if(ACTIVE_PROFILE!==profile) return;
     CLOUD.pin=newPin; CLOUD.unlocked=true; CLOUD.lastSaved=new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
-    if(dbForNewPin!==DB){
+    if(JSON.stringify(dbForNewPin)!==JSON.stringify(DB)){
       DB=dbForNewPin;
       normalizeDB();
-      save();
+      localStorage.setItem(profileKey(),JSON.stringify(DB));
       refreshAll();
     }
     document.getElementById('cloudPin').value=newPin;
@@ -192,8 +268,8 @@ function updateCloudUI(){
     return;
   }
   document.getElementById('cloudHelp').textContent=CLOUD.unlocked
-    ? "Unlocked. Local changes auto-save encrypted to cloud."
-    : "Enter this profile's PIN, then load or save cloud.";
+    ? "Unlocked. Changes merge and auto-save encrypted to cloud."
+    : "Enter this profile's PIN, then merge cloud data or save.";
   if(CLOUD.unlocked&&CLOUD.syncError){
     setCloudState("Sync failed — retrying");
     document.getElementById('cloudHelp').textContent="Last save didn't reach the cloud. Retrying automatically; changes are safe locally.";
@@ -219,9 +295,12 @@ function hideProfileGate(){
   document.getElementById('profileGate').classList.add('hide');
   document.getElementById('gateMsg').textContent='';
   syncGateLock();
+  requestAnimationFrame(showRecoveryIfNeeded);
 }
 function logout(){
+  saveWorkoutOnLeave();
   clearSession();
+  clearTimeout(CLOUD.timer); CLOUD.pending=false;
   CLOUD.pin=''; CLOUD.unlocked=false; CLOUD.lastSaved='';
   document.getElementById('cloudPin').value='';
   closeSheets();
@@ -233,6 +312,8 @@ function switchProfile(profile,opts={}){
   if(!next){ toast("Enter profile name"); return false; }
   const existed=hasStoredProfile(next);
   if(next===ACTIVE_PROFILE && (!opts.createDefault || existed)) return true;
+  saveWorkoutOnLeave();
+  clearTimeout(CLOUD.timer); CLOUD.pending=false;
   ACTIVE_PROFILE=next;
   localStorage.setItem(PROFILE_KEY,ACTIVE_PROFILE);
   CLOUD.pin=''; CLOUD.unlocked=false; CLOUD.lastSaved='';
@@ -287,7 +368,7 @@ document.getElementById('profileGate').addEventListener('keydown',e=>{
 });
 
 function seed(withHistory){
-  DB={schemaVersion:4,initialized:true,exercises:SEED.map(s=>({id:uid('e'),...s})), sets:[],workouts:[],activeWorkout:null,weekPlans:{}};
+  DB={schemaVersion:5,initialized:true,exercises:SEED.map(s=>({id:uid('e'),...s,variant:variantOf(s)})), sets:[],workouts:[],activeWorkout:null,weekPlans:{},gyms:[]};
   if(withHistory){
     // 7 weeks of progressing data
     const baseKg={"Cable Rows":30,"Overhead Press":30,"Single-arm Face Pulls":15,"Cable Squats":40,"Single Cable Leg Curl":30,"Cable Single-leg Calf Raise":35,"Ring Dips":0,"Triceps Pulldown":22.5,"Triceps Overhead Ext.":20,"Cable Lateral Raise - Lower Path":10,"Cable Lateral Raise - Upper Path":7.5,"Bayesian Single-arm Curl":12.5,"Single-arm Cable Shrugs":25,Pullups:0,Pushups:0};
