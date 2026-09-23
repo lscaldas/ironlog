@@ -90,8 +90,11 @@ async function signInWithGoogle(){
     const selected=document.getElementById('gateProfile').value.trim();
     if(selected&&!switchProfile(selected,{toast:false})) return false;
   }
-  if(!await initFirebaseSync()){
-    document.getElementById('gateMsg').textContent='Firebase is unavailable. You can continue locally.';
+  if(!CLOUD.sdk||!CLOUD.auth){
+    const ready=await initFirebaseSync();
+    document.getElementById('gateMsg').textContent=ready
+      ? 'Google sign-in is ready. Tap Continue with Google again.'
+      : 'Firebase is unavailable. You can continue locally.';
     return false;
   }
   const source=ACTIVE_PROFILE.startsWith('firebase_')?'':ACTIVE_PROFILE;
@@ -100,16 +103,16 @@ async function signInWithGoogle(){
   try{
     if(CLOUD.auth.currentUser){ await openFirebaseProfile(CLOUD.auth.currentUser); return true; }
     const provider=new CLOUD.sdk.GoogleAuthProvider();
-    if(window.matchMedia('(max-width: 700px)').matches){
-      await CLOUD.sdk.signInWithRedirect(CLOUD.auth,provider);
-    }else{
-      await CLOUD.sdk.signInWithPopup(CLOUD.auth,provider);
-    }
+    await CLOUD.sdk.signInWithPopup(CLOUD.auth,provider);
     return true;
   }catch(err){
     sessionStorage.removeItem(FIREBASE_IMPORT_PROFILE);
-    document.getElementById('gateMsg').textContent=err.code==='auth/popup-closed-by-user'
-      ? 'Google sign-in was cancelled.' : 'Google sign-in failed. Please try again.';
+    document.getElementById('gateMsg').textContent=
+      err.code==='auth/popup-closed-by-user' ? 'Google sign-in was cancelled.'
+      : err.code==='auth/popup-blocked' ? 'Google sign-in was blocked. Allow pop-ups in Chrome and try again.'
+      : err.code==='auth/operation-not-supported-in-this-environment'
+        ? 'Open IronLog directly in Chrome or Safari and try again.'
+        : 'Google sign-in failed. Please try again.';
     updateCloudUI();
     return false;
   }

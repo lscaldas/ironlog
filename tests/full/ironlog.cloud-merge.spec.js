@@ -29,6 +29,28 @@ async function fakeFirestore(page){
   });
 }
 
+test('Android Chrome Google sign-in opens a popup without redirecting',async({page})=>{
+  await page.setViewportSize({width:390,height:844});
+  await page.addInitScript(()=>{
+    const auth={currentUser:null};
+    window.signInCalls=[];
+    window.IRONLOG_FIREBASE_SDK={
+      initializeApp:()=>({}),
+      getAuth:()=>auth,
+      getFirestore:()=>({}),
+      onAuthStateChanged:()=>{},
+      getRedirectResult:async()=>null,
+      GoogleAuthProvider:class {},
+      signInWithPopup:async()=>{ window.signInCalls.push('popup'); },
+      signInWithRedirect:async()=>{ window.signInCalls.push('redirect'); }
+    };
+  });
+  await page.goto('/');
+  await page.locator('#gateProfile').fill('android_user');
+  await page.locator('#gateGoogleBtn').click();
+  await expect.poll(()=>page.evaluate(()=>window.signInCalls)).toEqual(['popup']);
+});
+
 test('Google sign-in merges local and cloud sets with a recovery copy',async({page})=>{
   await openLocal(page);
   await fakeFirestore(page);
