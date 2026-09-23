@@ -2,10 +2,11 @@
 /* Google sign-in and per-user Firebase sync. Workout data is saved locally first. */
 const FIREBASE_SDK_VERSION='12.19.0';
 const FIREBASE_IMPORT_PROFILE='ironlog.firebase.importProfile';
+const FIREBASE_LAST_USER='ironlog.firebase.lastUser';
 const FIREBASE_CHUNK_LENGTH=180000;
 const FIREBASE_MAX_BYTES=4*1024*1024;
 const CLOUD={sdk:null,auth:null,firestore:null,user:null,unlocked:false,saving:false,pending:false,
-  timer:null,lastSaved:'',syncError:false,initPromise:null,preferLocal:AUTH_SESSION?.mode==='local'};
+  timer:null,lastSaved:'',syncError:false,initPromise:null,offlineCache:false,preferLocal:AUTH_SESSION?.mode==='local'};
 
 function firebaseConfig(){ return window.IRONLOG_FIREBASE||{}; }
 function cloudReady(){
@@ -13,6 +14,12 @@ function cloudReady(){
   return Boolean(c.apiKey&&c.authDomain&&c.projectId&&c.appId);
 }
 function firebaseProfileId(user){ return 'firebase_'+user.uid; }
+function cachedFirebaseUser(){
+  try{
+    const user=JSON.parse(localStorage.getItem(FIREBASE_LAST_USER));
+    return user&&typeof user.uid==='string'&&user.uid&&hasStoredProfile(firebaseProfileId(user))?user:null;
+  }catch(_){ return null; }
+}
 function firebaseChunkId(index){ return 'chunk-'+String(index).padStart(4,'0'); }
 function parseFirebaseProfile(raw){
   if(raw==null) return blankDB();
@@ -53,7 +60,7 @@ function initFirebaseSync(){
           updateCloudUI();
           toast('Could not open Google profile. Local data is still on this device.');
         });
-      }else if(CLOUD.user){
+      }else if(CLOUD.user&&!CLOUD.offlineCache){
         leaveFirebaseProfile();
       }
     });
@@ -102,12 +109,13 @@ async function signInWithGoogle(){
   }
 }
 async function openFirebaseProfile(user){
-  if(CLOUD.user?.uid===user.uid && CLOUD.unlocked) return;
+  if(CLOUD.user?.uid===user.uid && CLOUD.unlocked && !CLOUD.offlineCache) return;
   const source=sessionStorage.getItem(FIREBASE_IMPORT_PROFILE);
   sessionStorage.removeItem(FIREBASE_IMPORT_PROFILE);
   const importDb=source&&hasStoredProfile(source)?load(source):null;
   const profile=firebaseProfileId(user);
   CLOUD.user=user;
+  CLOUD.offlineCache=false;
   CLOUD.unlocked=false;
   CLOUD.syncError=false;
   ACTIVE_PROFILE=profile;
@@ -118,6 +126,7 @@ async function openFirebaseProfile(user){
   }
   normalizeDB();
   localStorage.setItem(profileKey(),JSON.stringify(DB));
+  localStorage.setItem(FIREBASE_LAST_USER,JSON.stringify({uid:user.uid,email:user.email||'',displayName:user.displayName||''}));
   clearSession();
   CLOUD.unlocked=true;
   refreshAll();
@@ -127,7 +136,7 @@ async function openFirebaseProfile(user){
   await saveCloudProfile(false);
 }
 async function saveCloudProfile(manual=false){
-  if(!CLOUD.user||!CLOUD.unlocked||!CLOUD.sdk) return false;
+  if(!CLOUD.user||!CLOUD.unlocked||!CLOUD.sdk||CLOUD.offlineCache) return false;
   if(CLOUD.saving){ CLOUD.pending=true; return false; }
   if(!navigator.onLine){
     CLOUD.syncError=true;
@@ -182,7 +191,7 @@ async function saveCloudProfile(manual=false){
   }
 }
 function queueCloudSave(delay=900){
-  if(!CLOUD.user||!CLOUD.unlocked) return;
+  if(!CLOUD.user||!CLOUD.unlocked||CLOUD.offlineCache) return;
   if(CLOUD.saving){ CLOUD.pending=true; return; }
   clearTimeout(CLOUD.timer);
   CLOUD.timer=setTimeout(()=>{ CLOUD.timer=null; saveCloudProfile(false); },delay);
@@ -190,6 +199,7 @@ function queueCloudSave(delay=900){
 }
 function profileSyncStatus(){
   if(!CLOUD.user) return {mode:'local',label:'Local'};
+  if(CLOUD.offlineCache) return {mode:'offline',label:'Offline cache'};
   if(!navigator.onLine) return {mode:'offline',label:'Offline'};
   if(CLOUD.syncError) return {mode:'error',label:'Sync issue'};
   if(!CLOUD.unlocked||CLOUD.saving||CLOUD.pending||CLOUD.timer) return {mode:'syncing',label:'Syncing'};
@@ -197,14 +207,18 @@ function profileSyncStatus(){
 }
 function updateCloudUI(){
   const signedIn=Boolean(CLOUD.user);
+  const cached=cachedFirebaseUser();
   const label=signedIn?(CLOUD.user.displayName||CLOUD.user.email||'Google account'):ACTIVE_PROFILE;
   document.getElementById('activeProfileName').textContent=label;
   document.getElementById('profileInput').value=signedIn?'':ACTIVE_PROFILE;
   document.getElementById('localProfileField').hidden=signedIn;
   document.getElementById('cloudIdentity').textContent=signedIn?(CLOUD.user.email||label):'No Google account connected';
-  document.getElementById('cloudSignInBtn').hidden=signedIn;
-  document.getElementById('cloudSyncBtn').hidden=!signedIn;
+  document.getElementById('cloudSignInBtn').hidden=signedIn&&!CLOUD.offlineCache;
+  document.getElementById('cloudSyncBtn').hidden=!signedIn||CLOUD.offlineCache;
   document.getElementById('cloudSignOutBtn').hidden=!signedIn;
+  const offlineBtn=document.getElementById('gateOfflineBtn');
+  offlineBtn.hidden=!cached||(navigator.onLine&&!CLOUD.syncError);
+  if(cached) offlineBtn.textContent='Open cached workouts as '+(cached.email||cached.displayName||'Google account');
   document.getElementById('wipeBtn').hidden=signedIn;
   const status=profileSyncStatus();
   const pill=document.getElementById('profilePill');
@@ -215,6 +229,7 @@ function updateCloudUI(){
   document.getElementById('cloudHelp').textContent=!cloudReady()
     ? 'Firebase is not configured. Your workouts are saved locally.'
     : !signedIn ? 'Sign in with Google to merge this local profile and sync between devices.'
+    : CLOUD.offlineCache ? 'Cached workouts are available here. Sign in with Google to resume syncing.'
     : status.mode==='offline'||status.mode==='error'
       ? 'Changes remain on this device and will sync when the connection returns.'
       : 'Your workouts are saved locally and synced to your Google account.';
@@ -238,9 +253,23 @@ function hideProfileGate(){
   syncGateLock();
   requestAnimationFrame(showRecoveryIfNeeded);
 }
+function openOfflineFirebaseProfile(){
+  const user=cachedFirebaseUser();
+  if(!user) return;
+  CLOUD.preferLocal=false;
+  CLOUD.user=user;
+  CLOUD.offlineCache=true;
+  CLOUD.unlocked=true;
+  ACTIVE_PROFILE=firebaseProfileId(user);
+  DB=load();
+  normalizeDB();
+  refreshAll();
+  updateCloudUI();
+  hideProfileGate();
+}
 function leaveFirebaseProfile(){
   clearTimeout(CLOUD.timer); CLOUD.timer=null; CLOUD.pending=false;
-  CLOUD.user=null; CLOUD.unlocked=false; CLOUD.syncError=false; CLOUD.lastSaved='';
+  CLOUD.user=null; CLOUD.unlocked=false; CLOUD.offlineCache=false; CLOUD.syncError=false; CLOUD.lastSaved='';
   ACTIVE_PROFILE=sanitizeProfileId(localStorage.getItem(PROFILE_KEY))||'lucas';
   DB=load();
   normalizeDB(); refreshAll(); updateCloudUI();
@@ -249,7 +278,17 @@ function leaveFirebaseProfile(){
 async function logout(){
   saveWorkoutOnLeave();
   if(CLOUD.user){
+    if(CLOUD.offlineCache){
+      CLOUD.preferLocal=true;
+      if(CLOUD.auth?.currentUser&&CLOUD.sdk) await CLOUD.sdk.signOut(CLOUD.auth);
+      localStorage.removeItem(FIREBASE_LAST_USER);
+      clearSession();
+      closeSheets();
+      leaveFirebaseProfile();
+      return;
+    }
     if(navigator.onLine) await saveCloudProfile(false);
+    localStorage.removeItem(FIREBASE_LAST_USER);
     clearSession();
     await CLOUD.sdk.signOut(CLOUD.auth);
     closeSheets();
@@ -287,6 +326,7 @@ window.addEventListener('online',()=>{ updateCloudUI(); queueCloudSave(250); });
 window.addEventListener('offline',updateCloudUI);
 window.addEventListener('focus',()=>{ if(CLOUD.user) queueCloudSave(250); });
 document.getElementById('gateGoogleBtn').onclick=signInWithGoogle;
+document.getElementById('gateOfflineBtn').onclick=openOfflineFirebaseProfile;
 document.getElementById('gateLocalBtn').onclick=openLocalProfile;
 document.getElementById('cloudSignInBtn').onclick=signInWithGoogle;
 document.getElementById('cloudSyncBtn').onclick=()=>saveCloudProfile(true);

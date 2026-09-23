@@ -95,3 +95,35 @@ test('Google accounts have isolated workout records',async({page})=>{
   expect(result.first).toContain('first-set');
   expect(result.second).not.toContain('first-set');
 });
+
+test('cached Google workouts open offline and merge after reconnect',async({page,context})=>{
+  await openLocal(page);
+  await page.evaluate(async()=>{
+    await navigator.serviceWorker.ready;
+    const cached=structuredClone(DB);
+    cached.sets.push({id:'offline-set',exId:cached.exercises[0].id,date:todayKey(),ts:Date.now(),reps:8,kg:20});
+    localStorage.setItem('ironlog.v2.firebase_offline-user',JSON.stringify(cached));
+    localStorage.setItem(FIREBASE_LAST_USER,JSON.stringify({uid:'offline-user',email:'offline@example.com'}));
+    clearSession();
+  });
+  await context.setOffline(true);
+  await page.reload();
+  await expect(page.locator('#gateOfflineBtn')).toBeVisible();
+  await page.locator('#gateOfflineBtn').click();
+  await expect(page.locator('#profileSyncMode')).toHaveText('Offline cache');
+  const offlineIds=await page.evaluate(()=>{
+    const ex=DB.exercises[0];
+    DB.sets.push({id:'new-offline-set',exId:ex.id,date:todayKey(),ts:Date.now(),reps:9,kg:20});
+    save();
+    return DB.sets.map(set=>set.id);
+  });
+  expect(offlineIds).toEqual(expect.arrayContaining(['offline-set','new-offline-set']));
+  await context.setOffline(false);
+  await fakeFirestore(page);
+  const synced=await page.evaluate(async()=>{
+    await openFirebaseProfile({uid:'offline-user',email:'offline@example.com'});
+    return JSON.parse(fakeCloudDocs.get('users/offline-user/ironlog/chunk-0000').body).sets.map(set=>set.id);
+  });
+  expect(synced).toEqual(expect.arrayContaining(['offline-set','new-offline-set']));
+  await expect(page.locator('#profileSyncMode')).toHaveText('Live');
+});

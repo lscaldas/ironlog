@@ -1,19 +1,19 @@
-const CACHE_NAME = 'ironlog-static-v37';
+const CACHE_NAME = 'ironlog-static-v38';
 const APP_SHELL = [
   './',
   './index.html',
-  './styles.css?v=37',
-  './firebase-config.js?v=37',
-  './js/storage.js?v=37',
-  './js/catalog-data.js?v=37',
-  './js/helpers.js?v=37',
-  './js/week.js?v=37',
-  './js/exercises.js?v=37',
-  './js/stats.js?v=37',
-  './js/merge.js?v=37',
-  './js/data.js?v=37',
-  './js/firebase-cloud.js?v=37',
-  './js/init.js?v=37',
+  './styles.css?v=38',
+  './firebase-config.js?v=38',
+  './js/storage.js?v=38',
+  './js/catalog-data.js?v=38',
+  './js/helpers.js?v=38',
+  './js/week.js?v=38',
+  './js/exercises.js?v=38',
+  './js/stats.js?v=38',
+  './js/merge.js?v=38',
+  './js/data.js?v=38',
+  './js/firebase-cloud.js?v=38',
+  './js/init.js?v=38',
   './manifest.webmanifest',
   './icons/icon.svg'
 ];

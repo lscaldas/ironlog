@@ -12,7 +12,7 @@
 <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="icons/icon.svg">
 <title>IronLog — Weekly Sets</title>
-<link rel="stylesheet" href="styles.css?v=37">
+<link rel="stylesheet" href="styles.css?v=38">
 </head>
 <body>
 <div class="gate" id="profileGate">
@@ -21,6 +21,7 @@
     <h2>Open IronLog</h2>
     <p>Sign in with Google to sync workouts across devices. You can import an IronLog JSON backup after signing in.</p>
     <button class="btn" id="gateGoogleBtn" type="button">Continue with Google</button>
+    <button class="ghost" id="gateOfflineBtn" type="button" hidden style="width:100%;margin-top:9px;">Open cached workouts offline</button>
     <div class="field" style="margin-top:18px;"><label for="gateProfile">Local profile name</label><input id="gateProfile" autocomplete="off" placeholder="e.g. lucas"></div>
     <button class="ghost" id="gateLocalBtn" type="button" style="width:100%;margin-top:9px;">Use local only</button>
     <p class="h3sub" id="gateMsg" style="margin:12px 0 0;"></p>
@@ -244,16 +245,16 @@
 
 <div class="toast" id="toast"></div>
 
-<script src="firebase-config.js?v=37"></script>
-<script src="js/storage.js?v=37"></script>
-<script src="js/catalog-data.js?v=37"></script>
-<script src="js/helpers.js?v=37"></script>
-<script src="js/week.js?v=37"></script>
-<script src="js/exercises.js?v=37"></script>
-<script src="js/stats.js?v=37"></script>
-<script src="js/merge.js?v=37"></script>
-<script src="js/data.js?v=37"></script>
-<script src="js/firebase-cloud.js?v=37"></script>
-<script src="js/init.js?v=37"></script>
+<script src="firebase-config.js?v=38"></script>
+<script src="js/storage.js?v=38"></script>
+<script src="js/catalog-data.js?v=38"></script>
+<script src="js/helpers.js?v=38"></script>
+<script src="js/week.js?v=38"></script>
+<script src="js/exercises.js?v=38"></script>
+<script src="js/stats.js?v=38"></script>
+<script src="js/merge.js?v=38"></script>
+<script src="js/data.js?v=38"></script>
+<script src="js/firebase-cloud.js?v=38"></script>
+<script src="js/init.js?v=38"></script>
 </body>
 </html>

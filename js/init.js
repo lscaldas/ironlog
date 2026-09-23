@@ -173,6 +173,6 @@ window.addEventListener('pagehide',saveWorkoutOnLeave);
 
 if('serviceWorker' in navigator){
   window.addEventListener('load',()=>{
-    navigator.serviceWorker.register('./sw.js?v=37').then(reg=>reg.update()).catch(()=>{});
+    navigator.serviceWorker.register('./sw.js?v=38').then(reg=>reg.update()).catch(()=>{});
   });
 }

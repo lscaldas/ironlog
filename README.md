@@ -30,6 +30,7 @@ Local profiles are stored in browser `localStorage` under `ironlog.v2.<profile>`
 
 - Adding exercises, sections, and sets does not rewrite `index.html`.
 - Each Google account has separate cloud data. The profile button shows Local, Syncing, Live, Offline, or Sync issue.
+- A previously synced Google profile can be opened from its device cache while offline. Sign in again after reconnecting to merge those changes.
 - Use **Data & backup -> Export data (JSON)** to back up or move data.
 - Use **Import data (JSON) · merge** after signing in to add an old backup to the chosen Google account. Matching record IDs are merged; this does not replace newer workouts.
 
