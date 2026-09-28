@@ -103,7 +103,7 @@ function validateImportedDB(raw){
     if(set.generatedSample!==undefined&&typeof set.generatedSample!=='boolean') return {ok:false,message:"Invalid file"};
     const dateCheck=validateImportDate(set.date,set.ts);
     if(!dateCheck.ok) return dateCheck;
-    next.sets.push(Object.assign({}, set, {reps:reps.value, kg:kg.value}));
+    next.sets.push(Object.assign({}, set, {reps:reps.value, kg:kg.value, generatedSample:set.generatedSample===true}));
   }
 
   const knownSetIds=new Set(next.sets.map(s=>s.id));
@@ -225,12 +225,25 @@ document.getElementById('importFile').onchange=e=>{ const f=e.target.files[0]; i
   r.onload=()=>{ try{
     const result=validateImportedDB(JSON.parse(r.result));
     if(!result.ok){ toast(result.message||"Invalid file"); return; }
+    const incomingSetIds=new Set(result.db.sets.map(set=>set.id));
+    const incomingSetCount=incomingSetIds.size;
+    const incomingWorkoutCount=result.db.workouts.length;
+    const prompt=incomingSetCount===0
+      ? `This backup contains 0 sets and ${incomingWorkoutCount} workouts. No set history will be imported. If you expected a large history, cancel and export again from the old profile. Continue anyway?`
+      : `This backup contains ${incomingSetCount} sets and ${incomingWorkoutCount} workouts. Merge this history into the current profile?`;
+    if(!confirm(prompt)) return;
+    const existingSetIds=new Set(DB.sets.map(set=>set.id));
     if(hasStoredProfile(ACTIVE_PROFILE)) saveRecoveryCopy();
     DB=mergeProfileData(DB,result.db);
     normalizeDB(); save();
     if(!CLOUD.user) rememberSession('local');
     refreshAll(); closeSheets();
-    toast(CLOUD.user?'Imported and merged · syncing to Google':'Imported and merged locally');
+    const retained=DB.sets.filter(set=>incomingSetIds.has(set.id));
+    const newlyAdded=retained.filter(set=>!existingSetIds.has(set.id)).length;
+    const hiddenSample=retained.filter(set=>set.generatedSample===true).length;
+    toast(incomingSetCount===0?'Backup contained 0 sets':hiddenSample
+      ? `Imported ${retained.length}/${incomingSetCount} sets · ${hiddenSample} sample sets hidden`
+      : `Imported ${retained.length}/${incomingSetCount} sets · ${newlyAdded} new`);
   }catch(_){ toast("Could not read file"); } finally{ e.target.value=''; } }; r.readAsText(f); };
 document.getElementById('seedBtn').onclick=()=>{
   if(!confirm("Replace this profile with the built-in starter exercises? This deletes its workout history, current session, gyms, and weekly plans. Export a JSON backup first if you want to keep them. Continue?")) return;
