@@ -164,8 +164,9 @@ function renderPersonalBests(){
       const accessibleMode=item.bodyweightMode==='reps'?' bodyweight reps':item.bodyweightMode==='added'?' added-weight':'';
       return `<label class="pb-entry">
         <input class="pb-include" type="checkbox" data-key="${esc(item.key)}" ${PB_SELECTED.has(item.key)?'checked':''} aria-label="Include ${esc(item.exercise.name)}${accessibleMode}${item.machine?` at ${esc(item.locationLabel)}`:''} in share image">
-        <span class="pb-entry-copy"><span class="pb-name">${esc(item.exercise.name)}</span><span class="pb-meta">${location} · ${esc(fmtDate(item.result.date))}</span>${item.rank?`<span class="pb-rank">${esc(item.rank.label)}</span>`:''}</span>
+        <span class="pb-entry-copy"><span class="pb-name">${esc(item.exercise.name)}</span><span class="pb-meta">${location} · ${esc(fmtDate(item.result.date))}</span></span>
         <span class="pb-result">${esc(pbResultText(item))}</span>
+        ${item.rank?`<span class="pb-rank" aria-label="${esc(item.rank.label)} level"><span class="pb-medal-star" aria-hidden="true">★</span>${esc(item.rank.label)}</span>`:''}
       </label>`;
     }).join('');
     list.querySelectorAll('.pb-include').forEach(input=>input.onchange=()=>{
@@ -251,6 +252,30 @@ function drawPBText(ctx,text,x,y,maxWidth,size=40,weight=700){
   ctx.fillText(text,x,y);
 }
 
+function drawPBMedal(ctx,label,right,centerY,featured=false){
+  const height=featured?44:34,iconSize=featured?28:22,pad=featured?15:12;
+  ctx.font=`800 ${featured?19:15}px system-ui, sans-serif`;
+  const width=Math.ceil(ctx.measureText(label).width+iconSize+pad*2+6),x=right-width,y=centerY-height/2;
+  ctx.save();
+  ctx.shadowColor='rgba(169,139,255,.38)'; ctx.shadowBlur=featured?18:12; ctx.shadowOffsetY=3;
+  pbRoundRect(ctx,x,y,width,height,height/2);
+  const gradient=ctx.createLinearGradient(x,y,x+width,y+height);
+  gradient.addColorStop(0,'#45346f'); gradient.addColorStop(.55,'#30234f'); gradient.addColorStop(1,'#211b32');
+  ctx.fillStyle=gradient; ctx.fill();
+  ctx.shadowColor='transparent'; ctx.shadowBlur=0; ctx.shadowOffsetY=0;
+  ctx.strokeStyle='rgba(211,190,255,.8)'; ctx.lineWidth=featured?2:1.5; ctx.stroke();
+  const cx=x+pad+iconSize/2,cy=centerY;
+  ctx.beginPath(); ctx.arc(cx,cy,iconSize/2,0,Math.PI*2);
+  ctx.fillStyle='#a98bff'; ctx.fill();
+  ctx.strokeStyle='rgba(255,255,255,.52)'; ctx.lineWidth=1; ctx.stroke();
+  ctx.fillStyle='#fff'; ctx.font=`800 ${featured?15:12}px system-ui, sans-serif`;
+  ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText('★',cx,cy+.5);
+  ctx.fillStyle='#f3eaff'; ctx.font=`800 ${featured?19:15}px system-ui, sans-serif`;
+  ctx.textAlign='left'; ctx.fillText(label,x+pad+iconSize+7,centerY+.5);
+  ctx.restore();
+  return width;
+}
+
 function drawPBCard(ctx,item,x,y,width,height,featured=false){
   pbRoundRect(ctx,x,y,width,height,22);
   ctx.fillStyle='rgba(15,17,23,.76)'; ctx.fill();
@@ -258,22 +283,12 @@ function drawPBCard(ctx,item,x,y,width,height,featured=false){
   const pad=featured?42:26;
   const gym=item.machine?`${item.locationLabel} · Machine`:pbVariantLabel(item);
   ctx.textAlign='left'; ctx.fillStyle='rgba(235,230,255,.72)';
-  drawPBText(ctx,gym,x+pad,y+(featured?88:43),width-pad*2,featured?27:21,650);
+  const badgeWidth=item.rank?drawPBMedal(ctx,item.rank.label,x+width-pad,y+(featured?88:43),featured):0;
+  drawPBText(ctx,gym,x+pad,y+(featured?88:43),width-pad*2-badgeWidth-(badgeWidth?12:0),featured?27:21,650);
   ctx.fillStyle='#fff';
   drawPBText(ctx,item.exercise.name,x+pad,y+(featured?158:91),width-pad*2,featured?52:34,800);
   ctx.fillStyle='#c8aaff';
   drawPBText(ctx,pbResultText(item),x+pad,y+(featured?264:153),width-pad*2,featured?78:40,850);
-  if(item.rank){
-    const label=item.rank.label;
-    ctx.font=`700 ${featured?25:17}px system-ui, sans-serif`;
-    const badgeWidth=ctx.measureText(label).width+(featured?34:22),badgeHeight=featured?42:28;
-    const badgeY=y+(featured?320:166);
-    pbRoundRect(ctx,x+pad,badgeY,badgeWidth,badgeHeight,14);
-    ctx.fillStyle='rgba(171,137,255,.24)'; ctx.fill();
-    ctx.fillStyle='#e4d5ff'; ctx.textAlign='left'; ctx.textBaseline='middle';
-    ctx.fillText(label,x+pad+(featured?17:11),badgeY+badgeHeight/2);
-    ctx.textBaseline='alphabetic';
-  }
   ctx.fillStyle='rgba(235,230,255,.67)';
   drawPBText(ctx,fmtDate(item.result.date),x+pad,y+height-(featured?44:20),width-pad*2,featured?23:18,550);
 }
