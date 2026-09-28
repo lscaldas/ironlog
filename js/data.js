@@ -209,10 +209,7 @@ document.getElementById('exportBtn').onclick=()=>{
   const exportInfo={format:'ironlog',version:1,exportedAt:new Date().toISOString(),counts:{exercises:DB.exercises.length,sets:sets.length,workouts:DB.workouts.length}};
   const snapshot={...DB,sets,exportInfo};
   const counts=exportInfo.counts;
-  const prompt=counts.sets===0
-    ? 'This profile currently contains 0 sets. If you expected workout history, cancel and load the Supabase-synced profile before exporting. Export this empty history anyway?'
-    : `This backup will contain ${counts.sets} sets across ${counts.workouts} workouts. Download it now?`;
-  if(!confirm(prompt)) return;
+  if(counts.sets===0&&!confirm('This profile currently contains 0 sets. If you expected workout history, cancel and load the Supabase-synced profile before exporting. Export this empty history anyway?')) return;
   const b=new Blob([JSON.stringify(snapshot,null,2)],{type:'application/json'});
   const a=document.createElement('a'); a.href=URL.createObjectURL(b); a.download='ironlog-'+todayKey()+'.json'; a.click();
   setTimeout(()=>URL.revokeObjectURL(a.href),1000);
@@ -224,7 +221,7 @@ document.getElementById('importFile').onchange=e=>{ const f=e.target.files[0]; i
     const result=validateImportedDB(JSON.parse(r.result));
     if(!result.ok){ toast(result.message||"Invalid file"); return; }
     const setCount=result.db.sets.length,workoutCount=result.db.workouts.length;
-    if(!confirm(setCount===0?`This backup contains 0 sets and ${workoutCount} workouts. No set history will be imported. Continue anyway?`:`This backup contains ${setCount} sets and ${workoutCount} workouts. Replace this profile with the backup?`)) return;
+    if(setCount===0&&!confirm(`This backup contains 0 sets and ${workoutCount} workouts. No set history will be imported. Continue anyway?`)) return;
     DB=result.db; normalizeDB(); save(); rememberSession('local'); refreshAll(); closeSheets();
     const hidden=DB.sets.filter(set=>set.generatedSample===true).length;
     toast(hidden?`Imported ${setCount} sets · ${hidden} sample sets hidden`:`Imported ${setCount} sets ✓`);
