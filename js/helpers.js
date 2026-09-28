@@ -1,6 +1,8 @@
 "use strict";
 /* ================= Helpers ================= */
 const recordedSets=()=>DB.sets.filter(set=>set.generatedSample!==true);
+const isWarmupSet=set=>set?.effort==='warmup';
+const countsTowardVolume=set=>!isWarmupSet(set);
 const setsFor=(exId,mk)=>recordedSets().filter(s=>s.exId===exId && mondayOf(s.date)===mk);
 const allSetsFor=exId=>recordedSets().filter(s=>s.exId===exId).sort((a,b)=>(a.date||'').localeCompare(b.date||'')||a.ts-b.ts);
 function sampleSetCreationTime(id){
@@ -95,7 +97,7 @@ function muscleEffective(mk=thisWeek()){
   const ensure=m=>rows[m]||(rows[m]={muscle:m,eff:0,direct:0,inProgram:false});
   DB.exercises.forEach(ex=>{
     if(!ex.archived) ensure(muscleOf(ex)||'Other').inProgram=true;
-    const n=setsFor(ex.id,mk).length;
+    const n=setsFor(ex.id,mk).filter(countsTowardVolume).length;
     if(!n) return;
     exerciseContributions(ex).forEach(p=>{
       const row=ensure(p.muscle);
@@ -128,8 +130,13 @@ function betterSet(a,b){
   if(a.reps!==b.reps) return a.reps>b.reps ? a : b;
   return (a.ts||0)>=(b.ts||0) ? a : b;
 }
-function bestSet(sets){ return sets.filter(s=>s.mode!=='quick').reduce((best,s)=>betterSet(best,s),null); }
+function bestSet(sets){ return sets.filter(s=>s.mode!=='quick'&&!isWarmupSet(s)).reduce((best,s)=>betterSet(best,s),null); }
 function fmtSet(s){ return s?`${s.reps}×${fmtW(s.kg)}`:'—'; }
+function effortTag(set){
+  if(set.mode==='quick') return '';
+  const warmup=isWarmupSet(set),label=warmup?'Warm-up set':'Hard set';
+  return `<span class="effort-mark${warmup?' warmup':''}" title="${label}" aria-label="${label}">${warmup?'W':'H'}</span>`;
+}
 function currentActiveWorkout(){
   return DB.activeWorkout&&DB.activeWorkout.status==='active'?DB.activeWorkout:null;
 }
@@ -233,7 +240,7 @@ function deleteCompletedWorkout(id){
 function removeLoggedSet(id){
   const set=DB.sets.find(s=>s.id===id);
   if(!set){ toast("Set not found"); return false; }
-  const label=set.mode==='quick'?'quick set':`logged set ${fmtSet(set)}`;
+  const label=set.mode==='quick'?'quick set':`${isWarmupSet(set)?'warm-up':'hard'} set ${fmtSet(set)}`;
   if(!confirm(`Remove ${label}? This cannot be undone.`)) return false;
   markDeletedRecords([id]);
   DB.sets=DB.sets.filter(s=>s.id!==id);
@@ -252,7 +259,7 @@ function renderWorkoutPanel(){
   const panel=document.getElementById('workoutPanel');
   const w=currentActiveWorkout();
   if(!w){
-    panel.innerHTML=`<div class="workout-status"><strong>No active workout</strong>Start a session before logging sets.</div>
+    panel.innerHTML=`<div class="workout-status"><strong>No active workout</strong>Choose a location. Starting a session or logging your first set will begin one.</div>
       <div class="workout-actions"><select id="startLocation" aria-label="Workout location"><option value="home">Home</option>${(DB.gyms||[]).map(g=>`<option value="${esc(g.id)}">${esc(g.name)}</option>`).join('')}</select><button class="btn" id="startWorkoutBtn" type="button">Start workout</button></div>
       <button class="location-manage" id="manageGymsBtn" type="button">Manage gyms</button>`;
     panel.querySelector('#startWorkoutBtn').onclick=startWorkout;
@@ -285,7 +292,7 @@ function setDelta(first,last){
 function suggest(ex,context={}){
   const locationId=context.locationId||currentActiveWorkout()?.locationId||'home';
   const variant=variantOf(ex);
-  const all=allSetsFor(ex.id).filter(s=>s.mode!=='quick'&&(!context.date||s.date<=context.date)&&(s.locationId||'home')===locationId && (s.variant||variantOf(ex))===variant);
+  const all=allSetsFor(ex.id).filter(s=>s.mode!=='quick'&&!isWarmupSet(s)&&(!context.date||s.date<=context.date)&&(s.locationId||'home')===locationId && (s.variant||variantOf(ex))===variant);
   if(!all.length) return {reps:ex.low, kg:0, up:false,
     tip:`New — aim ${ex.low}–${ex.high} reps`,
     msg:`First time at ${esc(locationName(locationId))} with ${variant.toLowerCase()} equipment — find a weight you can do for ${ex.low}–${ex.high} reps`};
@@ -303,13 +310,14 @@ function suggest(ex,context={}){
 }
 
 /* ================= View switching ================= */
-const views={week:"v-week",history:"v-history",stats:"v-stats",catalog:"v-catalog"};
+const views={week:"v-week",history:"v-history",stats:"v-stats",personalBest:"v-personalBest",catalog:"v-catalog"};
 document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>{
   document.querySelectorAll('nav button').forEach(x=>x.classList.remove('on')); b.classList.add('on');
   Object.values(views).forEach(id=>document.getElementById(id).classList.remove('active'));
   document.getElementById(views[b.dataset.view]).classList.add('active');
   if(b.dataset.view==='history')renderHistory();
   if(b.dataset.view==='stats')requestAnimationFrame(renderStats);
+  if(b.dataset.view==='personalBest')renderPersonalBests();
   if(b.dataset.view==='catalog')renderCatalog();
   window.scrollTo(0,0);
 });

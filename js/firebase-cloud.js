@@ -229,6 +229,7 @@ function updateCloudUI(){
   offlineBtn.hidden=!cached||(navigator.onLine&&!CLOUD.syncError);
   if(cached) offlineBtn.textContent='Open cached workouts as '+(cached.email||cached.displayName||'Google account');
   document.getElementById('wipeBtn').hidden=signedIn;
+  document.getElementById('wipeAction').hidden=signedIn;
   const status=profileSyncStatus();
   const pill=document.getElementById('profilePill');
   pill.dataset.mode=status.mode;

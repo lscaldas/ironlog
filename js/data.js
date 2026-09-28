@@ -85,6 +85,7 @@ function validateImportedDB(raw){
     if(typeof set.exId!=='string'||!exerciseIds.has(set.exId)) return {ok:false,message:"Invalid file"};
     const quick=set.mode==='quick';
     if(set.mode!==undefined&&set.mode!=='quick') return {ok:false,message:"Invalid file"};
+    if(set.effort!==undefined&&!['hard','warmup'].includes(set.effort)) return {ok:false,message:"Invalid file"};
     const reps=importNumber(set.reps,{integer:true,min:quick?0:1,max:999});
     if(!reps.ok||(quick&&reps.value!==0)) return {ok:false,message:"Invalid file"};
     const kg=importNumber(set.kg===undefined?0:set.kg,{min:0,max:999,decimals:2});
@@ -178,7 +179,10 @@ function updateRecoveryUI(){
 }
 function openDataSheet(){ updateRecoveryUI(); updateSampleCleanupUI(); openSheet('dataSheet'); }
 document.getElementById('menuBtn').onclick=openDataSheet;
-document.getElementById('dataSheetBack').onclick=closeSheets;
+document.getElementById('dataSheetBack').onclick=()=>{
+  closeSheets();
+  document.querySelector('nav button[data-view="week"]')?.click();
+};
 document.getElementById('profilePill').onclick=openDataSheet;
 document.getElementById('mergeRecoveryBtn').onclick=()=>{
   const key=document.getElementById('recoveryCopySelect').value;
@@ -220,9 +224,12 @@ document.getElementById('importFile').onchange=e=>{ const f=e.target.files[0]; i
     refreshAll(); closeSheets();
     toast(CLOUD.user?'Imported and merged · syncing to Google':'Imported and merged locally');
   }catch(_){ toast("Could not read file"); } finally{ e.target.value=''; } }; r.readAsText(f); };
-document.getElementById('seedBtn').onclick=()=>{ seed(); closeSheets(); toast("Program loaded 📋"); };
+document.getElementById('seedBtn').onclick=()=>{
+  if(!confirm("Replace this profile with the built-in starter exercises? This deletes its workout history, current session, gyms, and weekly plans. Export a JSON backup first if you want to keep them. Continue?")) return;
+  seed(); closeSheets(); toast("Starter program loaded; previous profile data was replaced");
+};
 document.getElementById('logoutBtn').onclick=()=>logout();
 document.getElementById('wipeBtn').onclick=()=>{
   if(CLOUD.user){ toast('Sign out of Google before erasing a local profile.'); return; }
-  if(confirm("Erase ALL data? Cannot be undone.")){ DB=blankDB(); DB.initialized=true; save(); refreshAll(); document.getElementById('importBtn').scrollIntoView({block:'center'}); toast("Erased"); }
+  if(confirm("Erase all data in this local profile? Exercises, workout history, gyms, and settings will be permanently deleted. Export a JSON backup first if you want to keep them. This cannot be undone. Continue?")){ DB=blankDB(); DB.initialized=true; save(); refreshAll(); document.getElementById('importBtn').scrollIntoView({block:'center'}); toast("Local profile erased"); }
 };

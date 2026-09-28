@@ -163,6 +163,6 @@ document.addEventListener('visibilitychange',()=>{
 
 if('serviceWorker' in navigator){
   window.addEventListener('load',()=>{
-    navigator.serviceWorker.register('./sw.js?v=43').then(reg=>reg.update()).catch(()=>{});
+    navigator.serviceWorker.register('./sw.js?v=48').then(reg=>reg.update()).catch(()=>{});
   });
 }

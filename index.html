@@ -20,7 +20,7 @@ if(location.hostname==='ironlog-43233.web.app'){
   }catch(_){ /* Keep this origin available for JSON export. */ }
 }
 </script>
-<link rel="stylesheet" href="styles.css?v=43">
+<link rel="stylesheet" href="styles.css?v=48">
 </head>
 <body>
 <div class="gate" id="profileGate">
@@ -75,7 +75,7 @@ if(location.hostname==='ironlog-43233.web.app'){
     <div class="gchips" id="groupSeg">
       <button class="gchip on" data-g="muscle">Muscle</button>
       <button class="gchip" data-g="region">Upper / Lower</button>
-      <button class="gchip" data-g="ppl">Push / Pull / Legs</button>
+      <button class="gchip" data-g="ppl">Push / Pull / Legs / Core</button>
     </div>
 
     <div id="weekList"></div>
@@ -95,7 +95,7 @@ if(location.hostname==='ironlog-43233.web.app'){
 
   <!-- ===== STATS ===== -->
   <section class="view" id="v-stats">
-    <div class="card-h" style="padding:0 4px;margin-bottom:10px;"><h2 style="font-size:17px;">Progress</h2></div>
+    <div class="card-h" style="padding:0 4px;margin-bottom:10px;"><h2 style="font-size:17px;">Weekly progress</h2></div>
     <div class="seg" id="rangeSeg">
       <button data-w="4">4 wk</button><button data-w="8">8 wk</button>
       <button data-w="12">12 wk</button><button data-w="999" class="on">All</button>
@@ -119,12 +119,32 @@ if(location.hostname==='ironlog-43233.web.app'){
       <div class="chart-legend"><span><i style="background:#8c76c9"></i>Maintain</span><span><i style="background:#bfa4ff"></i>Build</span><span><i style="background:#f7d78b"></i>Beast</span></div>
     </div>
     <div class="card">
-      <div class="card-h"><h2>Best-set progress</h2><div class="sub">weight first, then reps</div></div>
+      <div class="card-h"><h2>Weekly best-set trend</h2><div class="sub">best set each week · machines split by gym</div></div>
       <div id="progList"></div>
     </div>
     <div class="card">
       <div class="card-h"><h2>Set volume by exercise</h2></div>
       <div id="volBars"></div>
+    </div>
+  </section>
+
+  <!-- ===== PERSONAL BESTS ===== -->
+  <section class="view" id="v-personalBest">
+    <div class="card-h" style="padding:0 4px;margin-bottom:10px;align-items:flex-start;"><div><h2 style="font-size:17px;">Personal bests</h2><div class="sub">Your best ever set for each exercise · weight first, then reps</div></div></div>
+    <div class="card pb-share-controls">
+      <div class="card-h"><h2>Share your results</h2><div class="sub" id="pbSelectedCount">0 selected</div></div>
+      <p class="h3sub">Choose which results to include. Machine results stay separate by gym.</p>
+      <div class="pb-control-row"><button class="ghost btn-sm" id="pbSelectAll" type="button">Select all</button><button class="ghost btn-sm" id="pbSelectNone" type="button">Clear all</button></div>
+      <div class="pb-control-row"><button class="ghost" id="pbChooseBackground" type="button">Choose background image</button><button class="ghost" id="pbClearBackground" type="button" hidden>Remove background</button></div>
+      <div class="sub" id="pbBackgroundName">Optional · add a photo or meme from your device.</div>
+      <input id="pbBackgroundInput" type="file" accept="image/*" hidden>
+      <button class="btn" id="pbCreateImage" type="button" style="width:100%;margin-top:10px;">Create share image</button>
+    </div>
+    <div class="pb-list" id="personalBestList"></div>
+    <div class="card pb-preview" id="pbPreview" hidden>
+      <div class="card-h"><h2>Preview</h2></div>
+      <canvas id="pbShareCanvas" aria-label="Preview of your personal best share image"></canvas>
+      <div class="pb-control-row"><button class="ghost" id="pbDownload" type="button">Download image</button><button class="btn" id="pbShare" type="button">Share image</button></div>
     </div>
   </section>
 
@@ -146,6 +166,7 @@ if(location.hostname==='ironlog-43233.web.app'){
   <button class="on" data-view="week"><span class="ic">📋</span>Week</button>
   <button data-view="history"><span class="ic">📅</span>History</button>
   <button data-view="stats"><span class="ic">📈</span>Progress</button>
+  <button data-view="personalBest"><span class="ic">🏆</span>Bests</button>
   <button data-view="catalog"><span class="ic">&#9638;</span>Catalog</button>
 </nav>
 
@@ -156,6 +177,14 @@ if(location.hostname==='ironlog-43233.web.app'){
   <div id="restStatus" class="rest-status" hidden></div>
   <h3 id="logTitle">Log set</h3>
   <p class="h3sub" id="logSub"></p>
+  <div class="set-kind-block">
+    <div class="set-kind-title">Set type</div>
+    <div class="set-kind-toggle" role="group" aria-label="Choose hard set or warm-up">
+      <button class="on" id="setKindHard" type="button" aria-pressed="true"><span>Hard set</span><small>0–2 RIR</small></button>
+      <button id="setKindWarmup" type="button" aria-pressed="false"><span>Warm-up</span><small>easy prep · usually 4+ RIR</small></button>
+    </div>
+    <div class="set-kind-help">RIR = reps you could still do. Warm-ups stay in History but don’t count toward weekly muscle volume.</div>
+  </div>
   <div class="row" style="margin-bottom:14px;">
     <div class="stepwrap"><label>Reps</label>
       <div class="step"><button data-t="reps" data-d="-1">−</button><input id="inReps" type="number" inputmode="numeric"><button data-t="reps" data-d="1">＋</button></div></div>
@@ -189,6 +218,8 @@ if(location.hostname==='ironlog-43233.web.app'){
     <div class="field"><label for="pastWorkoutLocation">Gym</label><select id="pastWorkoutLocation"></select></div>
   </div>
   <div class="field"><label>Recording mode</label><div class="recovery-options"><button type="button" id="pastQuickMode">Quick log</button><button type="button" id="pastDetailedMode">Detailed log</button></div></div>
+  <label class="past-all-toggle"><input id="pastShowAllExercises" type="checkbox"> Show all exercises, including those outside that week’s plan</label>
+  <div class="sub" id="pastHiddenSelectionHelp" hidden>Some selected exercises are outside that week’s plan. Turn on “Show all exercises” to review them.</div>
   <div class="sub" id="pastWorkoutSummary"></div>
   <div id="pastWorkoutExercises"></div>
 </div>
@@ -217,7 +248,7 @@ if(location.hostname==='ironlog-43233.web.app'){
   <div class="field"><label for="fVariant">Equipment variant</label><select id="fVariant"><option value="Free weight">Free weight</option><option value="Cable">Cable</option><option value="Machine">Machine</option><option value="Bodyweight">Bodyweight</option></select></div>
   <div class="ex-suggestions" id="exSuggestList"></div>
   <div class="form-hint" id="matchHint"></div>
-  <div class="field"><label>My group / split</label><input id="fBucket" list="bkDL" placeholder="Upper"><datalist id="bkDL"></datalist></div>
+  <div class="field"><label for="fBucket">Catalog category</label><input id="fBucket" list="bkDL" placeholder="Upper"><datalist id="bkDL"></datalist><div class="choice-help">Used to organize the Catalog mapping. Week grouping is based on the muscle and area above.</div></div>
   <div class="row">
     <div class="field"><label>+Kg step</label><input id="fInc" type="number" inputmode="decimal" step="0.25" value="2.5"></div>
     <div class="field"><label>Rep range low</label><input id="fLow" type="number" inputmode="numeric" value="8"></div>
@@ -232,7 +263,7 @@ if(location.hostname==='ironlog-43233.web.app'){
 <!-- Data sheet -->
 <div class="sheet" id="dataSheet">
   <div class="grab"></div>
-  <button class="ghost" id="dataSheetBack" type="button" style="width:100%;margin-bottom:10px;text-align:left;">← Back to workout</button>
+  <button class="ghost" id="dataSheetBack" type="button" style="width:100%;margin-bottom:10px;text-align:left;">← Back to Week</button>
   <h3>Settings &amp; data</h3>
   <p class="h3sub">Workouts are saved on this device first. Sign in with Google to sync them between devices.</p>
   <div class="card" style="box-shadow:none;margin-bottom:10px;">
@@ -247,37 +278,39 @@ if(location.hostname==='ironlog-43233.web.app'){
       <button class="ghost" id="cloudSyncBtn" type="button" hidden>Sync now</button>
       <button class="ghost" id="cloudSignOutBtn" type="button" hidden>Sign out</button>
     </div>
-    <p class="h3sub" id="cloudHelp" style="margin:10px 0 0;">Sign in with Google to sync.</p>
+    <p class="h3sub" id="cloudHelp" style="margin:10px 0 0;">Sign in with Google to sync. Signing out does not delete the Google account’s cloud workouts.</p>
+    <p class="settings-help">Sign in merges this profile with Google sync. <strong>Sync now</strong> sends pending changes; <strong>Sign out</strong> removes this account from the device without deleting its cloud data.</p>
   </div>
-  <button class="ghost" id="exportBtn" style="width:100%;margin-bottom:10px;">⬇️ Export data (JSON)</button>
+  <div class="settings-action"><button class="ghost" id="exportBtn" type="button">⬇️ Export data (JSON)</button><p class="settings-help">Downloads a backup of this profile’s exercises, workouts, gyms, and settings.</p></div>
   <div class="card" id="recoveryCopies" hidden style="box-shadow:none;margin-bottom:10px;">
     <div class="card-h"><h2>Saved local copies</h2></div>
-    <p class="h3sub">Created before cloud merges on this device. Merge one to recover missing workouts.</p>
+    <p class="h3sub">Saved before cloud merges on this device. Merging adds records from the copy to this profile; it does not replace current data.</p>
     <div class="field"><label for="recoveryCopySelect">Choose a copy</label><select id="recoveryCopySelect"></select></div>
     <button class="ghost" id="mergeRecoveryBtn" type="button" style="width:100%;">Merge selected copy</button>
   </div>
-  <button class="ghost" id="importBtn" style="width:100%;margin-bottom:10px;">⬆️ Import data (JSON) · merge</button>
+  <div class="settings-action"><button class="ghost" id="importBtn" type="button">⬆️ Import data (JSON) · merge</button><p class="settings-help">Adds records from a JSON backup to this profile. Existing records are merged by ID; this does not clear the profile.</p></div>
   <input type="file" id="importFile" accept="application/json" style="display:none;">
   <button class="ghost" id="removeSampleBtn" type="button" hidden style="width:100%;margin-bottom:10px;">Remove generated sample sets</button>
   <p class="h3sub" id="sampleCleanupHelp" hidden style="margin:-3px 0 10px;">Generated example sets are excluded from History and Progress. Removing them saves a local recovery copy first.</p>
-  <button class="ghost" id="seedBtn" style="width:100%;margin-bottom:10px;">📋 Load my program (empty)</button>
-  <button class="ghost" id="logoutBtn" style="width:100%;margin-bottom:10px;">Log out</button>
-  <div class="card"><div class="card-h"><h2>Workout locations</h2></div><div id="gymList"></div><div class="row"><input id="gymName" maxlength="80" placeholder="Gym name, e.g. FitX Alexanderplatz"><button class="ghost" id="addGymBtn" type="button">Add</button></div></div>
-  <button class="ghost" id="wipeBtn" style="width:100%;color:var(--accent);border-color:var(--accent);">🗑️ Erase all data</button>
+  <div class="settings-action danger-action"><button class="ghost" id="seedBtn" type="button">Replace with starter program</button><p class="settings-help">Replaces this profile’s exercises and deletes its workout history, gyms, weekly plans, and active session. Export a JSON backup first if you want to keep them.</p></div>
+  <div class="settings-action"><button class="ghost" id="logoutBtn" type="button">Log out</button><p class="settings-help">Signs out on this device. It does not delete your saved workouts or Google account.</p></div>
+  <div class="card"><div class="card-h"><h2>Workout locations</h2></div><p class="h3sub">Gym choice keeps previous weights separate by location. Removing a gym does not delete its saved workout history.</p><div id="gymList"></div><div class="row"><input id="gymName" maxlength="80" placeholder="Gym name, e.g. FitX Alexanderplatz"><button class="ghost" id="addGymBtn" type="button">Add gym</button></div></div>
+  <div class="settings-action danger-action" id="wipeAction" style="margin-top:10px;"><button class="ghost" id="wipeBtn" type="button">🗑️ Erase this local profile</button><p class="settings-help">Permanently deletes this local profile’s exercises, workout history, gyms, and settings. Export a JSON backup first; this cannot be undone.</p></div>
 </div>
 
 <div class="toast" id="toast"></div>
 
-<script src="firebase-config.js?v=43"></script>
-<script src="js/storage.js?v=43"></script>
-<script src="js/catalog-data.js?v=43"></script>
-<script src="js/helpers.js?v=43"></script>
-<script src="js/week.js?v=43"></script>
-<script src="js/exercises.js?v=43"></script>
-<script src="js/stats.js?v=43"></script>
-<script src="js/merge.js?v=43"></script>
-<script src="js/data.js?v=43"></script>
-<script src="js/firebase-cloud.js?v=43"></script>
-<script src="js/init.js?v=43"></script>
+<script src="firebase-config.js?v=48"></script>
+<script src="js/storage.js?v=48"></script>
+<script src="js/catalog-data.js?v=48"></script>
+<script src="js/helpers.js?v=48"></script>
+<script src="js/week.js?v=48"></script>
+<script src="js/exercises.js?v=48"></script>
+<script src="js/stats.js?v=48"></script>
+<script src="js/personal-best.js?v=48"></script>
+<script src="js/merge.js?v=48"></script>
+<script src="js/data.js?v=48"></script>
+<script src="js/firebase-cloud.js?v=48"></script>
+<script src="js/init.js?v=48"></script>
 </body>
 </html>

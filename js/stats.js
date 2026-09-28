@@ -17,7 +17,7 @@ function statWeeks(){
 function renderStats(){
   const weeks=statWeeks();
   const inRange=s=>weeks.includes(mondayOf(s.date));
-  const sets=recordedSets().filter(inRange);
+  const sets=recordedSets().filter(s=>inRange(s)&&countsTowardVolume(s));
   document.getElementById('aVol').textContent=sets.length;
   document.getElementById('aSets').textContent=new Set(sets.map(s=>s.exId)).size;
   document.getElementById('groupVolumeHelp').textContent=sets.length
@@ -30,16 +30,24 @@ function renderStats(){
   drawVolumeCharts(weeks);
   // best-set progress per exercise
   const pl=document.getElementById('progList');
-  const rows=DB.exercises.map(e=>{
-    const all=allSetsFor(e.id).filter(s=>s.mode!=='quick'&&inRange(s)); if(all.length<1)return null;
-    const weekly=topSetPerWeek(e.id,weeks);
-    const seen=weekly.filter(Boolean);
-    const first=seen[0], last=seen[seen.length-1];
-    const delta=setDelta(first,last);
-    return {e,series:weekly.map(setScore),delta,last};
+  const rows=DB.exercises.flatMap(e=>{
+    const all=allSetsFor(e.id).filter(s=>s.mode!=='quick'&&!isWarmupSet(s)&&inRange(s));
+    if(all.length<1)return [];
+    // Machine loads are specific to the machine at each gym, so keep those
+    // histories separate. Other exercises continue to use one exercise row.
+    const machine=variantOf(e)==='Machine';
+    const locations=machine?[...new Set(all.map(s=>s.locationId||'home'))]:[null];
+    return locations.map(locationId=>{
+      const matching=locationId===null?all:all.filter(s=>(s.locationId||'home')===locationId);
+      const weekly=topSetPerWeek(matching,weeks);
+      const seen=weekly.filter(Boolean);
+      const first=seen[0], last=seen[seen.length-1];
+      const delta=setDelta(first,last);
+      return {e,locationLabel:locationId===null?'':locationName(locationId),series:weekly.map(setScore),delta,last};
+    });
   }).filter(Boolean).sort((a,b)=>b.delta.rank-a.delta.rank);
   pl.innerHTML=rows.length?rows.map((r,i)=>
-    `<div class="prog"><div class="pn">${esc(r.e.name)}<div class="sub">${fmtSet(r.last)}</div></div><canvas class="spark" id="sp${i}" width="70" height="26"></canvas>
+    `<div class="prog"><div class="pn">${esc(r.e.name)}<div class="sub">${r.locationLabel?`${esc(r.locationLabel)} · Machine · `:''}${fmtSet(r.last)}</div></div><canvas class="spark" id="sp${i}" width="70" height="26"></canvas>
      <div class="pd ${r.delta.cls}">${r.delta.arrow} ${r.delta.label}</div></div>`).join('')
     :`<div class="sub">Log a few weeks to see trends.</div>`;
   rows.forEach((r,i)=>drawSpark(document.getElementById('sp'+i),r.series));
@@ -54,7 +62,7 @@ function renderStats(){
       <span style="width:54px;text-align:right;font-weight:600;font-variant-numeric:tabular-nums">${v} set${v===1?'':'s'}</span></div>`).join('')
     :`<div class="sub">No set volume yet.</div>`;
 }
-function topSetPerWeek(exId,weeks){ return weeks.map(mk=>bestSet(recordedSets().filter(s=>s.exId===exId&&mondayOf(s.date)===mk))); }
+function topSetPerWeek(sets,weeks){ return weeks.map(mk=>bestSet(sets.filter(s=>mondayOf(s.date)===mk))); }
 
 /* ===== charts ===== */
 function setupCanvas(cv){

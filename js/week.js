@@ -28,7 +28,7 @@ function groupedExercises(mode,exercises=DB.exercises){
   return keys.map(k=>[k,m[k]]);
 }
 function groupProgress(items,mk){
-  return items.reduce((sum,e)=>sum+setsFor(e.id,mk).length,0);
+  return items.reduce((sum,e)=>sum+setsFor(e.id,mk).filter(countsTowardVolume).length,0);
 }
 function groupVisKey(mode,name){ return `${mode}:${name}`; }
 function isGroupVisible(mode,name){ return GROUP_VIS[groupVisKey(mode,name)]!==false; }
@@ -176,13 +176,14 @@ function contribSummary(e,max=3){
 }
 function exCard(e,mk){
   const sets=setsFor(e.id,mk).sort((a,b)=>a.ts-b.ts);
-  const done=sets.length;
+  const done=sets.filter(countsTowardVolume).length;
+  const warmups=sets.filter(isWarmupSet).length;
   const sg=suggest(e);
   const node=document.createElement('div'); node.className='ex';
   // Keep the card compact: only this week's three latest sets are shown.
   const recentSets=sets.slice(-3);
   const best=bestSet(recentSets);
-  const chips=recentSets.map(s=>`<span class="wkchip ${best&&s.id===best.id&&recentSets.length>1?'best':''}">${s.mode==='quick'?'<b>Quick set</b>':`<b>${s.reps}</b>×${fmtW(s.kg)}<button class="editSet" type="button" data-sid="${esc(s.id)}" aria-label="Edit set ${s.reps} by ${fmtW(s.kg)}">Edit</button>`}<button class="x" type="button" data-sid="${esc(s.id)}" aria-label="Remove ${s.mode==='quick'?'quick set':`set ${s.reps} by ${fmtW(s.kg)}`}">x</button></span>`).join('');
+  const chips=recentSets.map(s=>`<span class="wkchip ${best&&s.id===best.id&&recentSets.length>1?'best':''} ${isWarmupSet(s)?'warmup-chip':''}">${s.mode==='quick'?'<b>Quick set</b>':`<b>${s.reps}</b>×${fmtW(s.kg)} ${effortTag(s)}<button class="editSet" type="button" data-sid="${esc(s.id)}" aria-label="Edit ${isWarmupSet(s)?'warm-up':'hard'} set ${s.reps} by ${fmtW(s.kg)}">Edit</button>`}<button class="x" type="button" data-sid="${esc(s.id)}" aria-label="Remove ${s.mode==='quick'?'quick set':`${isWarmupSet(s)?'warm-up':'hard'} set ${s.reps} by ${fmtW(s.kg)}`}">x</button></span>`).join('');
   const contribChips=exerciseContributions(e).map(p=>`<span class="contrib ${p.primary?'primary':''}">+${fmtEff(p.weight)} ${esc(p.muscle)}</span>`).join('');
   const progressTip=sg.tip.replace(/\s*·\s*last [^·]+$/i,'').replace(/^Last [^·]+·\s*/i,'');
   const tip=progressTip+(e.notes?` · ${esc(e.notes)}`:'');
@@ -192,7 +193,7 @@ function exCard(e,mk){
     <div class="ex-top">
       <div class="ex-main">
         <div class="exname">${esc(e.name)}</div><small class="variant-tag">${esc(variantOf(e))}</small>
-        <div class="ex-meta"><span class="remain"><b>${done}</b> set${done===1?'':'s'} this week</span></div>
+        <div class="ex-meta"><span class="remain"><b>${done}</b> volume set${done===1?'':'s'}${warmups?` · ${warmups} warm-up`:''} this week</span></div>
         <div class="contribs"><span class="contrib-note">each set</span>${contribChips}</div>
         <div class="exsub">${tip}</div>
         ${matchNote?`<div class="match-note">${matchNote}</div>`:''}
@@ -248,9 +249,21 @@ function setLogButtonsBusy(busy){
   document.getElementById('saveSetBtn').disabled=busy;
   document.getElementById('saveSetMoreBtn').disabled=busy;
 }
+let SET_EFFORT='hard';
+function setSetEffort(effort){
+  SET_EFFORT=effort==='warmup'?'warmup':'hard';
+  const hard=SET_EFFORT==='hard';
+  const hardButton=document.getElementById('setKindHard'),warmupButton=document.getElementById('setKindWarmup');
+  hardButton.classList.toggle('on',hard); hardButton.setAttribute('aria-pressed',String(hard));
+  warmupButton.classList.toggle('on',!hard); warmupButton.setAttribute('aria-pressed',String(!hard));
+}
+document.getElementById('setKindHard').onclick=()=>setSetEffort('hard');
+document.getElementById('setKindWarmup').onclick=()=>setSetEffort('warmup');
 function openLog(e){
   PAST_LOGGING=false;
-  ensureActiveWorkout("Workout started");
+  setSetEffort('hard');
+  const startLocation=document.getElementById('startLocation')?.value||'home';
+  ensureActiveWorkout(`Workout started · ${locationName(startLocation)}`,startLocation);
   renderWorkoutPanel();
   setLogButtonsBusy(false);
   editSetId=null;
@@ -273,6 +286,7 @@ function openSetEdit(set){
   const e=exerciseById(set.exId);
   if(!e){ toast("Exercise missing"); return; }
   setLogButtonsBusy(false);
+  setSetEffort(isWarmupSet(set)?'warmup':'hard');
   logEx=e;
   editSetId=set.id;
   document.getElementById('saveSetBtn').textContent='Save set';
@@ -311,7 +325,7 @@ function doLog(){
   if(!values) return false;
   const {reps,kg}=values;
   const w=ensureActiveWorkout();
-  const sig=[w.id,logEx.id,reps,kg].join(':');
+  const sig=[w.id,logEx.id,reps,kg,SET_EFFORT].join(':');
   const now=Date.now();
   if(LAST_LOG_SIGNATURE.sig===sig && now-LAST_LOG_SIGNATURE.at<900){
     toast("Set already logged");
@@ -319,7 +333,7 @@ function doLog(){
   }
   setLogButtonsBusy(true);
   const d=todayKey();
-  const set={id:uid('s'),workoutId:w.id,exId:logEx.id,date:d,ts:now,reps,kg,locationId:w.locationId||'home',variant:variantOf(logEx)};
+  const set={id:uid('s'),workoutId:w.id,exId:logEx.id,date:d,ts:now,reps,kg,effort:SET_EFFORT,locationId:w.locationId||'home',variant:variantOf(logEx)};
   DB.sets.push(set);
   w.setIds=[...new Set((w.setIds||[]).concat(set.id))];
   LAST_LOG_SIGNATURE={sig,at:now};
@@ -334,6 +348,7 @@ function doUpdateSet(){
   setLogButtonsBusy(true);
   set.reps=values.reps;
   set.kg=values.kg;
+  set.effort=SET_EFFORT;
   save();
   return true;
 }
@@ -354,21 +369,23 @@ document.getElementById('saveSetBtn').onclick=()=>{
   if(PAST_LOGGING){ if(!appendPastDetailedSet()) setLogButtonsBusy(false); return; }
   if(editSetId){ if(doUpdateSet()){ closeSheets(); refreshAll(); toast("Set updated"); } else setLogButtonsBusy(false); return; }
   const e=logEx;
+  const effort=SET_EFFORT;
   const before=e?muscleEffective(thisWeek()):null;
   if(doLog()){
     closeSheets(); renderWeek();
-    toast(tierCrossToast(e,thisWeek(),before)||`${contribSummary(e)} ✓`);
+    toast(effort==='warmup'?'Warm-up logged · excluded from weekly volume':tierCrossToast(e,thisWeek(),before)||`${contribSummary(e)} ✓`);
   } else setLogButtonsBusy(false);
 };
 document.getElementById('saveSetMoreBtn').onclick=()=>{
   const e=logEx;
+  const effort=SET_EFFORT;
   const before=e?muscleEffective(thisWeek()):null;
   if(doLog()){
     REST_UNTIL=Date.now()+90*1000;
     if(REST_INTERVAL) clearInterval(REST_INTERVAL);
     REST_INTERVAL=setInterval(updateRestStatus,1000);
     renderWeek(); openLog(e);
-    toast(tierCrossToast(e,thisWeek(),before)||`${contribSummary(e)} ✓`);
+    toast(effort==='warmup'?'Warm-up logged · excluded from weekly volume':tierCrossToast(e,thisWeek(),before)||`${contribSummary(e)} ✓`);
   } else setLogButtonsBusy(false);
 };
 document.getElementById('restBarsBtn').onclick=()=>{

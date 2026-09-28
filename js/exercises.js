@@ -248,7 +248,7 @@ function renderHistory(){
       return `<div class="day-ex"><div class="nm">${esc(nameOf(id))} <span style="color:var(--dim);font-weight:400">·${ss.length} set${ss.length>1?'s':''}</span></div>
         <div class="st">${ss.map(s=>s.mode==='quick'
           ? `<span class="history-set"><span>Quick set</span><button class="historyRemoveSet" type="button" data-sid="${esc(s.id)}" aria-label="Remove quick set">Remove</button></span>`
-          : `<span class="history-set"><span>${s.reps}×${fmtW(s.kg)}</span><button class="historyEditSet" type="button" data-sid="${esc(s.id)}" aria-label="Edit set ${s.reps} by ${fmtW(s.kg)}">Edit</button></span>`).join('<span aria-hidden="true"> · </span>')}</div></div>`;
+          : `<span class="history-set"><span>${s.reps}×${fmtW(s.kg)} ${effortTag(s)}</span><button class="historyEditSet" type="button" data-sid="${esc(s.id)}" aria-label="Edit ${isWarmupSet(s)?'warm-up':'hard'} set ${s.reps} by ${fmtW(s.kg)}">Edit</button></span>`).join('<span aria-hidden="true"> · </span>')}</div></div>`;
     }).join('');
     const label=`${inProgress?'Workout in progress':'Completed workout session'} ${relDay(w.date||dateKey(new Date(w.startedAt)))} ${sets.length} set${sets.length===1?'':'s'}`;
     const sessionSort=inProgress?Date.now():new Date((w.date||dateKey(new Date(w.startedAt)))+'T00:00:00').getTime()+((w.createdAt||w.endedAt||w.startedAt)%86400000)/86400000;
@@ -268,7 +268,7 @@ function renderHistory(){
     const rows=Object.keys(byEx).map(id=>{
       const ss=byEx[id].sort((a,b)=>a.ts-b.ts);
       return `<div class="day-ex"><div class="nm">${esc(nameOf(id))} <span style="color:var(--dim);font-weight:400">·${ss.length} set${ss.length>1?'s':''}</span></div>
-        <div class="st">${ss.map(s=>`<span class="history-set"><span>${s.reps}×${fmtW(s.kg)}</span><button class="historyEditSet" type="button" data-sid="${esc(s.id)}" aria-label="Edit set ${s.reps} by ${fmtW(s.kg)}">Edit</button></span>`).join('<span aria-hidden="true"> · </span>')}</div></div>`;
+        <div class="st">${ss.map(s=>`<span class="history-set"><span>${s.reps}×${fmtW(s.kg)} ${effortTag(s)}</span><button class="historyEditSet" type="button" data-sid="${esc(s.id)}" aria-label="Edit ${isWarmupSet(s)?'warm-up':'hard'} set ${s.reps} by ${fmtW(s.kg)}">Edit</button></span>`).join('<span aria-hidden="true"> · </span>')}</div></div>`;
     }).join('');
     return `<div class="day legacy" data-sort="${new Date(d+'T23:59:59').getTime()}"><div class="day-h"><div><div class="day-date">${relDay(d)} logged sets</div>
       <div class="day-sum">${sets.length} sets · ${Object.keys(byEx).length} exercises</div></div><span class="chev">›</span></div>
@@ -310,9 +310,10 @@ function previousDateKey(){
 }
 function openPastWorkout(){
   const options=[{id:'home',name:'Home'},...(DB.gyms||[])];
-  if(!PAST_DRAFT) PAST_DRAFT={date:previousDateKey(),locationId:'home',mode:null,counts:{},sets:[]};
+  if(!PAST_DRAFT) PAST_DRAFT={date:previousDateKey(),locationId:'home',mode:null,counts:{},sets:[],showAllExercises:false};
   const dateInput=document.getElementById('pastWorkoutDate');
   dateInput.value=PAST_DRAFT.date; dateInput.max=todayKey();
+  document.getElementById('pastShowAllExercises').checked=PAST_DRAFT.showAllExercises===true;
   document.getElementById('pastWorkoutLocation').innerHTML=options.map(location=>`<option value="${esc(location.id)}">${esc(location.name)}</option>`).join('');
   document.getElementById('pastWorkoutLocation').value=PAST_DRAFT.locationId;
   renderPastWorkout(); openSheet('pastWorkoutSheet');
@@ -331,6 +332,11 @@ document.getElementById('pastWorkoutLocation').onchange=e=>{
   if(!PAST_DRAFT) return;
   PAST_DRAFT.locationId=e.target.value; renderPastWorkout();
 };
+document.getElementById('pastShowAllExercises').onchange=e=>{
+  if(!PAST_DRAFT) return;
+  PAST_DRAFT.showAllExercises=e.target.checked;
+  renderPastWorkout();
+};
 function setPastMode(mode){
   if(!PAST_DRAFT) return;
   PAST_DRAFT.mode=mode; renderPastWorkout();
@@ -339,7 +345,7 @@ document.getElementById('pastQuickMode').onclick=()=>setPastMode('quick');
 document.getElementById('pastDetailedMode').onclick=()=>setPastMode('detailed');
 function pastExercises(){
   const mk=mondayOf(PAST_DRAFT.date||todayKey());
-  return DB.exercises.filter(ex=>!ex.archived&&isGroupActive(focusGroupForExercise(ex),mk));
+  return DB.exercises.filter(ex=>!ex.archived&&(PAST_DRAFT.showAllExercises||isGroupActive(focusGroupForExercise(ex),mk)));
 }
 function pastSetSummary(){
   if(!PAST_DRAFT) return {count:0,exercises:0};
@@ -353,6 +359,8 @@ function pastSetSummary(){
 function renderPastWorkout(){
   if(!PAST_DRAFT) return;
   const list=document.getElementById('pastWorkoutExercises');
+  const hiddenSelectionHelp=document.getElementById('pastHiddenSelectionHelp');
+  hiddenSelectionHelp.hidden=true;
   const summary=pastSetSummary();
   document.getElementById('pastWorkoutSummary').textContent=`${fmtDate(PAST_DRAFT.date)} · ${locationName(PAST_DRAFT.locationId)} · ${summary.count} set${summary.count===1?'':'s'} across ${summary.exercises} exercise${summary.exercises===1?'':'s'}`;
   const saveButton=document.getElementById('savePastWorkoutBtn');
@@ -380,10 +388,16 @@ function renderPastWorkout(){
   list.querySelectorAll('[data-remove-set]').forEach(button=>button.onclick=()=>{
     PAST_DRAFT.sets.splice(Number(button.dataset.removeSet),1); renderPastWorkout();
   });
+  const visibleIds=new Set(exercises.map(ex=>ex.id));
+  const selectedIds=PAST_DRAFT.mode==='quick'
+    ? Object.keys(PAST_DRAFT.counts).filter(id=>PAST_DRAFT.counts[id]>0)
+    : PAST_DRAFT.sets.map(set=>set.exId);
+  hiddenSelectionHelp.hidden=!selectedIds.some(id=>!visibleIds.has(id));
 }
 function openPastSet(ex){
   if(!ex||!PAST_DRAFT) return;
   PAST_LOGGING=true; editSetId=null; logEx=ex;
+  setSetEffort('hard');
   setLogButtonsBusy(false);
   const sg=suggest(ex,{locationId:PAST_DRAFT.locationId,date:PAST_DRAFT.date});
   document.getElementById('saveSetBtn').textContent='Add set';
@@ -400,7 +414,7 @@ function openPastSet(ex){
 function appendPastDetailedSet(){
   const values=readSetInput();
   if(!values) return false;
-  PAST_DRAFT.sets.push({exId:logEx.id,...values,variant:variantOf(logEx)});
+  PAST_DRAFT.sets.push({exId:logEx.id,...values,effort:SET_EFFORT,variant:variantOf(logEx)});
   PAST_LOGGING=false; setLogButtonsBusy(false); closeSheets(); renderPastWorkout(); openSheet('pastWorkoutSheet');
   return true;
 }
@@ -413,10 +427,10 @@ function savePastWorkout(){
   const now=Date.now(),id=uid('w'),locationId=PAST_DRAFT.locationId;
   const workout={id,status:'completed',startedAt:new Date(date+'T12:00:00').getTime(),endedAt:new Date(date+'T12:00:00').getTime(),createdAt:now,date,pastEntry:true,entryMode:PAST_DRAFT.mode,locationId,locationName:locationName(locationId),setIds:[]};
   const entries=PAST_DRAFT.mode==='quick'
-    ? Object.entries(PAST_DRAFT.counts).flatMap(([exId,count])=>Array.from({length:count},()=>({exId,mode:'quick',reps:0,kg:0,variant:variantOf(exerciseById(exId)||{})})))
+    ? Object.entries(PAST_DRAFT.counts).flatMap(([exId,count])=>Array.from({length:count},()=>({exId,mode:'quick',effort:'hard',reps:0,kg:0,variant:variantOf(exerciseById(exId)||{})})))
     : PAST_DRAFT.sets;
   entries.forEach((entry,index)=>{
-    const set={id:uid('s'),workoutId:id,exId:entry.exId,date,ts:now+index,locationId,variant:entry.variant||variantOf(exerciseById(entry.exId)||{}),reps:entry.reps,kg:entry.kg};
+    const set={id:uid('s'),workoutId:id,exId:entry.exId,date,ts:now+index,locationId,variant:entry.variant||variantOf(exerciseById(entry.exId)||{}),effort:entry.effort==='warmup'?'warmup':'hard',reps:entry.reps,kg:entry.kg};
     if(entry.mode==='quick') set.mode='quick';
     DB.sets.push(set); workout.setIds.push(set.id);
   });
