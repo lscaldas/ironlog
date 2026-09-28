@@ -285,7 +285,6 @@ function leaveFirebaseProfile(){
   showProfileGate('Signed out of Google.');
 }
 async function logout(){
-  saveWorkoutOnLeave();
   if(CLOUD.user){
     if(CLOUD.offlineCache){
       CLOUD.preferLocal=true;
@@ -313,7 +312,6 @@ function switchProfile(profile,opts={}){
   if(!next){ toast('Enter a local profile name'); return false; }
   const existed=hasStoredProfile(next);
   if(next===ACTIVE_PROFILE&&(!opts.createDefault||existed)) return true;
-  saveWorkoutOnLeave();
   ACTIVE_PROFILE=next;
   localStorage.setItem(PROFILE_KEY,next);
   DB=load();

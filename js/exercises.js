@@ -8,7 +8,6 @@ function openEx(e){
   document.getElementById('exTitle').textContent=e?'Edit exercise':'Add exercise';
   document.getElementById('fName').value=e?e.name:'';
   document.getElementById('fVariant').value=e?variantOf(e):'Free weight';
-  renderExerciseLocations(e);
   document.getElementById('fMuscle').value=e?muscleOf(e):'';
   document.getElementById('fArea').value=e?areaOf(e):'';
   document.getElementById('fBucket').value=e?e.bucket:(DB.exercises[0]?.bucket||'Upper');
@@ -25,16 +24,6 @@ function openEx(e){
 }
 document.getElementById('addExBtn').onclick=()=>openEx(null);
 document.getElementById('cancelExBtn').onclick=closeSheets;
-function renderExerciseLocations(ex){
-  const box=document.getElementById('fLocations');
-  const selected=Array.isArray(ex?.locations)?ex.locations:(ex?null:(currentActiveWorkout()?[currentActiveWorkout().locationId||'home']:null));
-  const options=[{id:'home',name:'Home'},...(DB.gyms||[])];
-  box.innerHTML=`<label><input type="checkbox" value="all" ${selected?'':'checked'}> All locations</label>`+
-    options.map(g=>`<label><input type="checkbox" value="${esc(g.id)}" ${selected?.includes(g.id)?'checked':''} ${selected?'':'disabled'}> ${esc(g.name)}</label>`).join('');
-  box.querySelector('input[value="all"]').onchange=e=>{
-    box.querySelectorAll('input:not([value="all"])').forEach(input=>{ input.disabled=e.target.checked; if(e.target.checked) input.checked=false; });
-  };
-}
 function areaOptionsForMuscle(muscle){
   const current=document.getElementById('fArea').value.trim();
   if(!muscle) return current?[current]:[];
@@ -131,8 +120,12 @@ function updateMatchHint(){
   const hint=document.getElementById('matchHint');
   const match=exerciseMatch(name);
   if(match&&match.confidence!=='exact'){
-    hint.innerHTML=`Counting as <b>${esc(match.base)}</b>: ${esc(match.muscle)} · ${esc(match.area)}`;
+    hint.innerHTML=`Counting as <b>${esc(match.base)}</b>: ${esc(match.muscle)} · ${esc(match.area)} <button class="match-correct" type="button">Use suggested name</button>`;
     hint.classList.add('show');
+    hint.querySelector('.match-correct').onclick=()=>{
+      document.getElementById('fName').value=match.base;
+      inferNameFields();
+    };
   }else{
     hint.textContent='';
     hint.classList.remove('show');
@@ -162,11 +155,7 @@ document.getElementById('fName').onchange=()=>{
 document.getElementById('exDropBtn').onclick=()=>{ EX_CHOICES_OPEN=!EX_CHOICES_OPEN; renderExerciseChoices(); };
 document.getElementById('saveExBtn').onclick=()=>{
   const name=document.getElementById('fName').value.trim(); if(!name){ toast("Name it"); return; }
-  const locationBox=document.getElementById('fLocations');
-  const allLocations=locationBox.querySelector('input[value="all"]').checked;
-  const locations=allLocations?null:[...locationBox.querySelectorAll('input:checked')].map(input=>input.value);
-  if(locations&&!locations.length){ toast('Choose a location or All locations'); return; }
-  const obj={ name, variant:document.getElementById('fVariant').value, locations, muscle:(document.getElementById('fMuscle').value.trim()||guessMuscle(name)||'Other'),
+  const obj={ name, variant:document.getElementById('fVariant').value, muscle:(document.getElementById('fMuscle').value.trim()||guessMuscle(name)||'Other'),
     area:(document.getElementById('fArea').value.trim()||guessArea(name)||'Other'),
     bucket:(document.getElementById('fBucket').value.trim()||'Other'),
     low:parseInt(document.getElementById('fLow').value)||8, high:parseInt(document.getElementById('fHigh').value)||12,
@@ -238,7 +227,7 @@ document.getElementById('catalogSearch').oninput=renderCatalog;
 /* ================= HISTORY ================= */
 function renderHistory(){
   const nameOf=id=>(DB.exercises.find(e=>e.id===id)||{}).name||'(removed)';
-  const completed=DB.workouts.filter(w=>w.status==='completed').sort((a,b)=>(b.endedAt||b.startedAt)-(a.endedAt||a.startedAt));
+  const completed=DB.workouts.filter(w=>w.status==='completed').sort((a,b)=>(b.date||'').localeCompare(a.date||'')||(b.createdAt||b.endedAt||b.startedAt)-(a.createdAt||a.endedAt||a.startedAt));
   const active=currentActiveWorkout();
   const activeSets=setsForWorkout(active);
   const shownSetIds=new Set(completed.flatMap(w=>setsForWorkout(w).map(s=>s.id)).concat(activeSets.map(s=>s.id)));
@@ -257,13 +246,17 @@ function renderHistory(){
     const rows=Object.keys(byEx).map(id=>{
       const ss=byEx[id].sort((a,b)=>a.ts-b.ts);
       return `<div class="day-ex"><div class="nm">${esc(nameOf(id))} <span style="color:var(--dim);font-weight:400">·${ss.length} set${ss.length>1?'s':''}</span></div>
-        <div class="st">${ss.map(s=>`<span class="history-set"><span>${s.reps}×${fmtW(s.kg)}</span><button class="historyEditSet" type="button" data-sid="${esc(s.id)}" aria-label="Edit set ${s.reps} by ${fmtW(s.kg)}">Edit</button></span>`).join('<span aria-hidden="true"> · </span>')}</div></div>`;
+        <div class="st">${ss.map(s=>s.mode==='quick'
+          ? `<span class="history-set"><span>Quick set</span><button class="historyRemoveSet" type="button" data-sid="${esc(s.id)}" aria-label="Remove quick set">Remove</button></span>`
+          : `<span class="history-set"><span>${s.reps}×${fmtW(s.kg)}</span><button class="historyEditSet" type="button" data-sid="${esc(s.id)}" aria-label="Edit set ${s.reps} by ${fmtW(s.kg)}">Edit</button></span>`).join('<span aria-hidden="true"> · </span>')}</div></div>`;
     }).join('');
     const label=`${inProgress?'Workout in progress':'Completed workout session'} ${relDay(w.date||dateKey(new Date(w.startedAt)))} ${sets.length} set${sets.length===1?'':'s'}`;
-    return `<div class="day session" data-wid="${esc(w.id)}" data-sort="${inProgress?Date.now():(w.endedAt||w.startedAt)}">
+    const sessionSort=inProgress?Date.now():new Date((w.date||dateKey(new Date(w.startedAt)))+'T00:00:00').getTime()+((w.createdAt||w.endedAt||w.startedAt)%86400000)/86400000;
+    const duration=w.pastEntry?'past workout':`duration ${workoutDuration(w.startedAt,w.endedAt||w.startedAt)}`;
+    return `<div class="day session" data-wid="${esc(w.id)}" data-sort="${sessionSort}">
       <button class="session-row day-h" type="button" aria-expanded="false" aria-label="${esc(label)}">
         <div><div class="day-date">${inProgress?'Workout in progress':'Completed workout session'}</div>
-        <div class="day-sum">${relDay(w.date||dateKey(new Date(w.startedAt)))} · ${esc(w.locationName||locationName(w.locationId||'home'))} · duration ${workoutDuration(w.startedAt,w.endedAt||w.startedAt)} · ${sets.length} set${sets.length===1?'':'s'} · ${Object.keys(byEx).length} exercise${Object.keys(byEx).length===1?'':'s'}</div></div><span class="chev">›</span>
+        <div class="day-sum">${relDay(w.date||dateKey(new Date(w.startedAt)))} · ${esc(w.locationName||locationName(w.locationId||'home'))} · ${duration} · ${sets.length} set${sets.length===1?'':'s'} · ${Object.keys(byEx).length} exercise${Object.keys(byEx).length===1?'':'s'}</div></div><span class="chev">›</span>
       </button>
       ${inProgress?'':'<div class="session-actions"><button class="ghost btn-sm deleteWorkoutBtn" type="button">Delete</button></div>'}
       <div class="day-body">${rows||'<div class="sub">No sets saved in this workout.</div>'}</div>
@@ -304,4 +297,130 @@ function renderHistory(){
       if(set) openSetEdit(set); else toast("Set not found");
     };
   });
+document.querySelectorAll('#histList .historyRemoveSet').forEach(btn=>{
+    btn.onclick=e=>{ e.stopPropagation(); removeLoggedSet(btn.dataset.sid); };
+  });
 }
+
+/* ================= Missed workout entry ================= */
+let PAST_DRAFT=null;
+let PAST_LOGGING=false;
+function previousDateKey(){
+  const date=new Date(); date.setDate(date.getDate()-1); return dateKey(date);
+}
+function openPastWorkout(){
+  const options=[{id:'home',name:'Home'},...(DB.gyms||[])];
+  if(!PAST_DRAFT) PAST_DRAFT={date:previousDateKey(),locationId:'home',mode:null,counts:{},sets:[]};
+  const dateInput=document.getElementById('pastWorkoutDate');
+  dateInput.value=PAST_DRAFT.date; dateInput.max=todayKey();
+  document.getElementById('pastWorkoutLocation').innerHTML=options.map(location=>`<option value="${esc(location.id)}">${esc(location.name)}</option>`).join('');
+  document.getElementById('pastWorkoutLocation').value=PAST_DRAFT.locationId;
+  renderPastWorkout(); openSheet('pastWorkoutSheet');
+}
+document.getElementById('addPastWorkoutBtn').onclick=openPastWorkout;
+document.getElementById('cancelPastWorkoutBtn').onclick=()=>{ PAST_DRAFT=null; closeSheets(); };
+document.getElementById('pastWorkoutDate').onchange=e=>{
+  if(!PAST_DRAFT) return;
+  PAST_DRAFT.date=e.target.value;
+  const allowed=new Set(pastExercises().map(ex=>ex.id));
+  PAST_DRAFT.counts=Object.fromEntries(Object.entries(PAST_DRAFT.counts).filter(([id])=>allowed.has(id)));
+  PAST_DRAFT.sets=PAST_DRAFT.sets.filter(set=>allowed.has(set.exId));
+  renderPastWorkout();
+};
+document.getElementById('pastWorkoutLocation').onchange=e=>{
+  if(!PAST_DRAFT) return;
+  PAST_DRAFT.locationId=e.target.value; renderPastWorkout();
+};
+function setPastMode(mode){
+  if(!PAST_DRAFT) return;
+  PAST_DRAFT.mode=mode; renderPastWorkout();
+}
+document.getElementById('pastQuickMode').onclick=()=>setPastMode('quick');
+document.getElementById('pastDetailedMode').onclick=()=>setPastMode('detailed');
+function pastExercises(){
+  const mk=mondayOf(PAST_DRAFT.date||todayKey());
+  return DB.exercises.filter(ex=>!ex.archived&&isGroupActive(focusGroupForExercise(ex),mk));
+}
+function pastSetSummary(){
+  if(!PAST_DRAFT) return {count:0,exercises:0};
+  if(PAST_DRAFT.mode==='quick'){
+    const counts=Object.values(PAST_DRAFT.counts);
+    return {count:counts.reduce((sum,n)=>sum+n,0),exercises:counts.filter(Boolean).length};
+  }
+  const ids=new Set(PAST_DRAFT.sets.map(set=>set.exId));
+  return {count:PAST_DRAFT.sets.length,exercises:ids.size};
+}
+function renderPastWorkout(){
+  if(!PAST_DRAFT) return;
+  const list=document.getElementById('pastWorkoutExercises');
+  const summary=pastSetSummary();
+  document.getElementById('pastWorkoutSummary').textContent=`${fmtDate(PAST_DRAFT.date)} · ${locationName(PAST_DRAFT.locationId)} · ${summary.count} set${summary.count===1?'':'s'} across ${summary.exercises} exercise${summary.exercises===1?'':'s'}`;
+  const saveButton=document.getElementById('savePastWorkoutBtn');
+  saveButton.disabled=!summary.count;
+  saveButton.textContent=`Save past workout · ${summary.count} set${summary.count===1?'':'s'}`;
+  document.getElementById('pastQuickMode').classList.toggle('on',PAST_DRAFT.mode==='quick');
+  document.getElementById('pastDetailedMode').classList.toggle('on',PAST_DRAFT.mode==='detailed');
+  if(!PAST_DRAFT.mode){ list.innerHTML='<div class="sub">Choose Quick log or Detailed log to add exercises.</div>'; return; }
+  const exercises=pastExercises();
+  if(!exercises.length){ list.innerHTML='<div class="sub">No exercises are planned for that week. Update its weekly loadout or choose a different date.</div>'; return; }
+  list.innerHTML=exercises.map(ex=>{
+    if(PAST_DRAFT.mode==='quick'){
+      const selected=PAST_DRAFT.counts[ex.id]||0;
+      return `<div class="past-exercise past-quick-row"><div class="past-exercise-name">${esc(ex.name)}</div><div class="past-counts" role="group" aria-label="Sets completed for ${esc(ex.name)}">${[1,2,3,4,5].map(n=>`<button type="button" class="past-count ${selected===n?'on':''}" data-ex="${esc(ex.id)}" data-count="${n}" aria-pressed="${selected===n}">${n}</button>`).join('')}</div></div>`;
+    }
+    const sets=PAST_DRAFT.sets.map((set,index)=>({...set,index})).filter(set=>set.exId===ex.id);
+    const setRows=sets.map(set=>`<span class="past-set-chip">${set.reps}×${fmtW(set.kg)} <button type="button" data-remove-set="${set.index}" aria-label="Remove set">×</button></span>`).join('');
+    return `<div class="past-exercise"><div class="past-detail-head"><div class="past-exercise-name">${esc(ex.name)}</div><button class="ghost btn-sm past-add-set" type="button" data-ex="${esc(ex.id)}">＋ Add set</button></div>${setRows?`<div class="past-set-list">${setRows}</div>`:'<div class="sub">No sets added</div>'}</div>`;
+  }).join('');
+  list.querySelectorAll('.past-count').forEach(button=>button.onclick=()=>{
+    const id=button.dataset.ex,count=Number(button.dataset.count);
+    PAST_DRAFT.counts[id]=(PAST_DRAFT.counts[id]||0)===count?0:count; renderPastWorkout();
+  });
+  list.querySelectorAll('.past-add-set').forEach(button=>button.onclick=()=>openPastSet(exerciseById(button.dataset.ex)));
+  list.querySelectorAll('[data-remove-set]').forEach(button=>button.onclick=()=>{
+    PAST_DRAFT.sets.splice(Number(button.dataset.removeSet),1); renderPastWorkout();
+  });
+}
+function openPastSet(ex){
+  if(!ex||!PAST_DRAFT) return;
+  PAST_LOGGING=true; editSetId=null; logEx=ex;
+  setLogButtonsBusy(false);
+  const sg=suggest(ex,{locationId:PAST_DRAFT.locationId,date:PAST_DRAFT.date});
+  document.getElementById('saveSetBtn').textContent='Add set';
+  document.getElementById('saveSetMoreBtn').hidden=true;
+  document.getElementById('restBarsBtn').hidden=true;
+  document.getElementById('restStatus').hidden=true;
+  document.getElementById('logTitle').textContent=ex.name;
+  document.getElementById('logSub').textContent=`Past workout · ${fmtDate(PAST_DRAFT.date)}`;
+  document.getElementById('inReps').value=sg.reps;
+  document.getElementById('inKg').value=sg.kg;
+  const hint=document.getElementById('logHint'); hint.className='sugg '+(sg.up?'up':''); hint.innerHTML=`<span class="ic">💡</span><span class="m">${sg.msg}</span>`;
+  openSheet('logSheet');
+}
+function appendPastDetailedSet(){
+  const values=readSetInput();
+  if(!values) return false;
+  PAST_DRAFT.sets.push({exId:logEx.id,...values,variant:variantOf(logEx)});
+  PAST_LOGGING=false; setLogButtonsBusy(false); closeSheets(); renderPastWorkout(); openSheet('pastWorkoutSheet');
+  return true;
+}
+function savePastWorkout(){
+  if(!PAST_DRAFT) return;
+  const date=PAST_DRAFT.date;
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(date)||date>todayKey()){ toast('Choose today or an earlier date'); return; }
+  const summary=pastSetSummary();
+  if(!summary.count){ toast('Select at least one set'); return; }
+  const now=Date.now(),id=uid('w'),locationId=PAST_DRAFT.locationId;
+  const workout={id,status:'completed',startedAt:new Date(date+'T12:00:00').getTime(),endedAt:new Date(date+'T12:00:00').getTime(),createdAt:now,date,pastEntry:true,entryMode:PAST_DRAFT.mode,locationId,locationName:locationName(locationId),setIds:[]};
+  const entries=PAST_DRAFT.mode==='quick'
+    ? Object.entries(PAST_DRAFT.counts).flatMap(([exId,count])=>Array.from({length:count},()=>({exId,mode:'quick',reps:0,kg:0,variant:variantOf(exerciseById(exId)||{})})))
+    : PAST_DRAFT.sets;
+  entries.forEach((entry,index)=>{
+    const set={id:uid('s'),workoutId:id,exId:entry.exId,date,ts:now+index,locationId,variant:entry.variant||variantOf(exerciseById(entry.exId)||{}),reps:entry.reps,kg:entry.kg};
+    if(entry.mode==='quick') set.mode='quick';
+    DB.sets.push(set); workout.setIds.push(set.id);
+  });
+  DB.workouts.push(workout); PAST_DRAFT=null; save(); closeSheets(); refreshAll();
+  toast('Past workout saved ✓');
+}
+document.getElementById('savePastWorkoutBtn').onclick=savePastWorkout;

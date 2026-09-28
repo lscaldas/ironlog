@@ -326,7 +326,6 @@ function hideProfileGate(){
 window.addEventListener('online',updateCloudUI);
 window.addEventListener('offline',updateCloudUI);
 function logout(){
-  saveWorkoutOnLeave();
   clearSession();
   clearTimeout(CLOUD.timer); CLOUD.pending=false;
   CLOUD.pin=''; CLOUD.unlocked=false; CLOUD.lastSaved=''; CLOUD.syncError=false;
@@ -340,7 +339,6 @@ function switchProfile(profile,opts={}){
   if(!next){ toast("Enter profile name"); return false; }
   const existed=hasStoredProfile(next);
   if(next===ACTIVE_PROFILE && (!opts.createDefault || existed)) return true;
-  saveWorkoutOnLeave();
   clearTimeout(CLOUD.timer); CLOUD.pending=false;
   ACTIVE_PROFILE=next;
   localStorage.setItem(PROFILE_KEY,ACTIVE_PROFILE);

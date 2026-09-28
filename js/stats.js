@@ -31,7 +31,7 @@ function renderStats(){
   // best-set progress per exercise
   const pl=document.getElementById('progList');
   const rows=DB.exercises.map(e=>{
-    const all=allSetsFor(e.id).filter(inRange); if(all.length<1)return null;
+    const all=allSetsFor(e.id).filter(s=>s.mode!=='quick'&&inRange(s)); if(all.length<1)return null;
     const weekly=topSetPerWeek(e.id,weeks);
     const seen=weekly.filter(Boolean);
     const first=seen[0], last=seen[seen.length-1];

@@ -20,7 +20,7 @@ if(location.hostname==='ironlog-43233.web.app'){
   }catch(_){ /* Keep this origin available for JSON export. */ }
 }
 </script>
-<link rel="stylesheet" href="styles.css?v=41">
+<link rel="stylesheet" href="styles.css?v=43">
 </head>
 <body>
 <div class="gate" id="profileGate">
@@ -88,7 +88,7 @@ if(location.hostname==='ironlog-43233.web.app'){
 
   <!-- ===== HISTORY ===== -->
   <section class="view" id="v-history">
-    <div class="card-h" style="padding:0 4px;"><h2 style="font-size:17px;">History</h2><div class="sub" id="histCount"></div></div>
+    <div class="card-h" style="padding:0 4px;align-items:center;"><h2 style="font-size:17px;">History</h2><div class="row" style="align-items:center;gap:10px;"><div class="sub" id="histCount"></div><button class="ghost btn-sm" id="addPastWorkoutBtn" type="button">＋ Past workout</button></div></div>
     <div id="histList"></div>
     <div class="empty" id="histEmpty"><div class="big">📅</div><div>No sets logged yet.</div></div>
   </section>
@@ -178,6 +178,21 @@ if(location.hostname==='ironlog-43233.web.app'){
   <button class="btn" id="recoverySaveBtn" type="button">Save workout</button>
 </div>
 
+<!-- Add a workout that was missed on an earlier date -->
+<div class="sheet" id="pastWorkoutSheet">
+  <div class="grab"></div>
+  <div class="sheet-title"><h3>Add past workout</h3><button class="sheet-close" id="cancelPastWorkoutBtn" type="button" title="Cancel">×</button></div>
+  <p class="h3sub">Record the session on the day you trained. Quick log counts sets without guessing reps or weight; tap a selected count again to clear it.</p>
+  <button class="btn" id="savePastWorkoutBtn" type="button" disabled>Save past workout</button>
+  <div class="row">
+    <div class="field"><label for="pastWorkoutDate">Workout date</label><input id="pastWorkoutDate" type="date"></div>
+    <div class="field"><label for="pastWorkoutLocation">Gym</label><select id="pastWorkoutLocation"></select></div>
+  </div>
+  <div class="field"><label>Recording mode</label><div class="recovery-options"><button type="button" id="pastQuickMode">Quick log</button><button type="button" id="pastDetailedMode">Detailed log</button></div></div>
+  <div class="sub" id="pastWorkoutSummary"></div>
+  <div id="pastWorkoutExercises"></div>
+</div>
+
 <!-- Edit exercise sheet -->
 <div class="sheet" id="exSheet">
   <div class="grab"></div>
@@ -186,6 +201,7 @@ if(location.hostname==='ironlog-43233.web.app'){
     <button class="sheet-close" id="cancelExBtn" type="button" title="Cancel">x</button>
   </div>
   <p class="h3sub">Every set feeds the muscle bars — no per-exercise quota. Double progression: hit the top of your rep range, then add weight.</p>
+  <button class="btn" id="saveExBtn" type="button">Save exercise</button>
   <input id="fMuscle" type="hidden">
   <input id="fArea" type="hidden">
   <div class="field">
@@ -199,7 +215,6 @@ if(location.hostname==='ironlog-43233.web.app'){
   </div>
   <div class="field"><label>Exercise name</label><div class="input-combo"><input id="fName" list="exDL" placeholder="Select or type custom" autocomplete="off"><button class="drop-btn" id="exDropBtn" type="button" title="Show more exercise choices">v</button></div><datalist id="exDL"></datalist></div>
   <div class="field"><label for="fVariant">Equipment variant</label><select id="fVariant"><option value="Free weight">Free weight</option><option value="Cable">Cable</option><option value="Machine">Machine</option><option value="Bodyweight">Bodyweight</option></select></div>
-  <div class="field"><label>Available at</label><div class="location-choices" id="fLocations"></div></div>
   <div class="ex-suggestions" id="exSuggestList"></div>
   <div class="form-hint" id="matchHint"></div>
   <div class="field"><label>My group / split</label><input id="fBucket" list="bkDL" placeholder="Upper"><datalist id="bkDL"></datalist></div>
@@ -211,14 +226,14 @@ if(location.hostname==='ironlog-43233.web.app'){
     <div class="field"><label>Rep range high</label><input id="fHigh" type="number" inputmode="numeric" value="12"></div>
   </div>
   <div class="field"><label>Settings / notes (optional)</label><input id="fNotes" placeholder="e.g. bar, stand, 1cab2m"></div>
-  <button class="btn" id="saveExBtn">Save exercise</button>
   <button class="ghost" id="delExBtn" style="width:100%;margin-top:9px;color:var(--accent);border-color:var(--accent);display:none;">Remove from program</button>
 </div>
 
 <!-- Data sheet -->
 <div class="sheet" id="dataSheet">
   <div class="grab"></div>
-  <h3>Data &amp; backup</h3>
+  <button class="ghost" id="dataSheetBack" type="button" style="width:100%;margin-bottom:10px;text-align:left;">← Back to workout</button>
+  <h3>Settings &amp; data</h3>
   <p class="h3sub">Workouts are saved on this device first. Sign in with Google to sync them between devices.</p>
   <div class="card" style="box-shadow:none;margin-bottom:10px;">
     <div class="card-h"><h2>Profile</h2><div class="sub" id="cloudState">Local only</div></div>
@@ -253,16 +268,16 @@ if(location.hostname==='ironlog-43233.web.app'){
 
 <div class="toast" id="toast"></div>
 
-<script src="firebase-config.js?v=41"></script>
-<script src="js/storage.js?v=41"></script>
-<script src="js/catalog-data.js?v=41"></script>
-<script src="js/helpers.js?v=41"></script>
-<script src="js/week.js?v=41"></script>
-<script src="js/exercises.js?v=41"></script>
-<script src="js/stats.js?v=41"></script>
-<script src="js/merge.js?v=41"></script>
-<script src="js/data.js?v=41"></script>
-<script src="js/firebase-cloud.js?v=41"></script>
-<script src="js/init.js?v=41"></script>
+<script src="firebase-config.js?v=43"></script>
+<script src="js/storage.js?v=43"></script>
+<script src="js/catalog-data.js?v=43"></script>
+<script src="js/helpers.js?v=43"></script>
+<script src="js/week.js?v=43"></script>
+<script src="js/exercises.js?v=43"></script>
+<script src="js/stats.js?v=43"></script>
+<script src="js/merge.js?v=43"></script>
+<script src="js/data.js?v=43"></script>
+<script src="js/firebase-cloud.js?v=43"></script>
+<script src="js/init.js?v=43"></script>
 </body>
 </html>

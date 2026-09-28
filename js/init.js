@@ -61,7 +61,6 @@ function normalizeDB(){
     ["Shoulder Press","Overhead Press"],
     ["Face Pulls","Single-arm Face Pulls"],
     ["Cable Flys","Ring Dips"],
-    ["Biceps Curls","Bayesian Single-arm Curl"],
     ["Shrugs","Single-arm Cable Shrugs"],
     ["Squats","Cable Squats"],
     ["Leg Curls","Single Cable Leg Curl"],
@@ -158,21 +157,12 @@ updateCloudUI();
 if(AUTH_SESSION) hideProfileGate(); else showProfileGate();
 initFirebaseSync();
 
-// A hidden page or closed app ends a session at the last observable time.
-function saveWorkoutOnLeave(){
-  const w=currentActiveWorkout();
-  if(!w) return;
-  if(document.getElementById('recoverySheet').classList.contains('show')) return;
-  completeActiveWorkout(Date.now(),true);
-}
 document.addEventListener('visibilitychange',()=>{
-  if(document.visibilityState==='hidden') saveWorkoutOnLeave();
-  else syncCurrentWeekView();
+  if(document.visibilityState==='visible') syncCurrentWeekView();
 });
-window.addEventListener('pagehide',saveWorkoutOnLeave);
 
 if('serviceWorker' in navigator){
   window.addEventListener('load',()=>{
-    navigator.serviceWorker.register('./sw.js?v=41').then(reg=>reg.update()).catch(()=>{});
+    navigator.serviceWorker.register('./sw.js?v=43').then(reg=>reg.update()).catch(()=>{});
   });
 }

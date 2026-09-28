@@ -18,9 +18,9 @@ The weekly selection is stored by Monday date, survives reload/export/cloud sync
 ## Workouts and locations
 
 - Choose **Home** or a saved gym before starting. Manage gym names in **Data & backup**.
-- Each exercise has an equipment variant and optional **Available at** locations. A new exercise added during a workout defaults to that location; existing exercises remain available everywhere until edited.
-- Previous weights are suggested only for the same exercise, equipment variant, and location.
-- **Finish workout** saves immediately. Moving away from the app or closing it saves any active workout with logged sets. If an older active workout remains after a crash, the next launch asks for its duration and suggests 60 minutes when enough time has elapsed.
+- Exercises remain visible at every gym. Previous weights are suggested only for the same exercise, equipment variant, and selected gym.
+- **Finish workout** saves the active session. Leaving the app keeps it active so returning does not split the workout into multiple history entries. If an older active workout remains after a crash, the next launch asks for its duration and suggests 60 minutes when enough time has elapsed.
+- Use **History → Past workout** to record a missed session. Quick log records set counts for a selected date and gym without inventing reps or weights; those sets count toward weekly volume but do not affect weight suggestions or best-set progress. Detailed log records reps and weights as usual.
 - **Progress** shows weekly effective set volume for Legs, Core, Push, and Pull, plus one selected muscle with Maintain, Build, and Beast threshold lines. Weeks without sets appear as zero.
 - Older versions could generate seven weeks of example sets through **Load my program + sample history**. Those sets are excluded from History, muscle bars, and Progress. **Data & backup** offers a selective removal action when it recognizes them; it saves a local recovery copy first. Real logged sets remain untouched.
 

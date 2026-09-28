@@ -83,10 +83,12 @@ function validateImportedDB(raw){
     if(!isPlainObject(set)) return {ok:false,message:"Invalid file"};
     if(typeof set.id!=='string'||!set.id.trim()||setIds.has(set.id)) return {ok:false,message:"Invalid file"};
     if(typeof set.exId!=='string'||!exerciseIds.has(set.exId)) return {ok:false,message:"Invalid file"};
-    const reps=importNumber(set.reps,{integer:true,min:1,max:999});
-    if(!reps.ok) return {ok:false,message:"Invalid file"};
+    const quick=set.mode==='quick';
+    if(set.mode!==undefined&&set.mode!=='quick') return {ok:false,message:"Invalid file"};
+    const reps=importNumber(set.reps,{integer:true,min:quick?0:1,max:999});
+    if(!reps.ok||(quick&&reps.value!==0)) return {ok:false,message:"Invalid file"};
     const kg=importNumber(set.kg===undefined?0:set.kg,{min:0,max:999,decimals:2});
-    if(!kg.ok) return {ok:false,message:"Invalid file"};
+    if(!kg.ok||(quick&&kg.value!==0)) return {ok:false,message:"Invalid file"};
     if(set.locationId!==undefined&&typeof set.locationId!=='string') return {ok:false,message:"Invalid file"};
     if(set.variant!==undefined&&!EQUIPMENT_VARIANTS.includes(set.variant)) return {ok:false,message:"Invalid file"};
     if(set.generatedSample!==undefined&&typeof set.generatedSample!=='boolean') return {ok:false,message:"Invalid file"};
@@ -176,6 +178,7 @@ function updateRecoveryUI(){
 }
 function openDataSheet(){ updateRecoveryUI(); updateSampleCleanupUI(); openSheet('dataSheet'); }
 document.getElementById('menuBtn').onclick=openDataSheet;
+document.getElementById('dataSheetBack').onclick=closeSheets;
 document.getElementById('profilePill').onclick=openDataSheet;
 document.getElementById('mergeRecoveryBtn').onclick=()=>{
   const key=document.getElementById('recoveryCopySelect').value;

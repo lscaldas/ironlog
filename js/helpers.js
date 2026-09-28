@@ -2,7 +2,7 @@
 /* ================= Helpers ================= */
 const recordedSets=()=>DB.sets.filter(set=>set.generatedSample!==true);
 const setsFor=(exId,mk)=>recordedSets().filter(s=>s.exId===exId && mondayOf(s.date)===mk);
-const allSetsFor=exId=>recordedSets().filter(s=>s.exId===exId).sort((a,b)=>a.ts-b.ts);
+const allSetsFor=exId=>recordedSets().filter(s=>s.exId===exId).sort((a,b)=>(a.date||'').localeCompare(b.date||'')||a.ts-b.ts);
 function sampleSetCreationTime(id){
   const match=typeof id==='string'&&/^s([0-9a-z]+)([0-9a-z]{3})$/.exec(id);
   return match?parseInt(match[1],36):NaN;
@@ -119,7 +119,7 @@ function weeklyMaintainProgress(mk=thisWeek()){
   const done=list.filter(r=>r.eff>=muscleThresholds(r.muscle)[0]-1e-9).length;
   return {done,target:list.length};
 }
-function setScore(s){ return s ? ((s.kg||0)>0 ? (s.kg*1000+s.reps) : s.reps) : 0; }
+function setScore(s){ return s&&s.mode!=='quick' ? ((s.kg||0)>0 ? (s.kg*1000+s.reps) : s.reps) : 0; }
 function betterSet(a,b){
   if(!a) return b;
   if(!b) return a;
@@ -128,7 +128,7 @@ function betterSet(a,b){
   if(a.reps!==b.reps) return a.reps>b.reps ? a : b;
   return (a.ts||0)>=(b.ts||0) ? a : b;
 }
-function bestSet(sets){ return sets.reduce((best,s)=>betterSet(best,s),null); }
+function bestSet(sets){ return sets.filter(s=>s.mode!=='quick').reduce((best,s)=>betterSet(best,s),null); }
 function fmtSet(s){ return s?`${s.reps}×${fmtW(s.kg)}`:'—'; }
 function currentActiveWorkout(){
   return DB.activeWorkout&&DB.activeWorkout.status==='active'?DB.activeWorkout:null;
@@ -233,7 +233,8 @@ function deleteCompletedWorkout(id){
 function removeLoggedSet(id){
   const set=DB.sets.find(s=>s.id===id);
   if(!set){ toast("Set not found"); return false; }
-  if(!confirm(`Remove logged set ${fmtSet(set)}? This cannot be undone.`)) return false;
+  const label=set.mode==='quick'?'quick set':`logged set ${fmtSet(set)}`;
+  if(!confirm(`Remove ${label}? This cannot be undone.`)) return false;
   markDeletedRecords([id]);
   DB.sets=DB.sets.filter(s=>s.id!==id);
   if(DB.activeWorkout&&Array.isArray(DB.activeWorkout.setIds)){
@@ -281,10 +282,10 @@ function setDelta(first,last){
 /* Double-progression suggestion from most recent set.
    The prefilled reps/kg always REPEAT the last set (realistic — no auto jump in weight).
    Progression is shown only as a text hint the lifter can choose to act on. */
-function suggest(ex){
-  const locationId=currentActiveWorkout()?.locationId||'home';
+function suggest(ex,context={}){
+  const locationId=context.locationId||currentActiveWorkout()?.locationId||'home';
   const variant=variantOf(ex);
-  const all=allSetsFor(ex.id).filter(s=>(s.locationId||'home')===locationId && (s.variant||variantOf(ex))===variant);
+  const all=allSetsFor(ex.id).filter(s=>s.mode!=='quick'&&(!context.date||s.date<=context.date)&&(s.locationId||'home')===locationId && (s.variant||variantOf(ex))===variant);
   if(!all.length) return {reps:ex.low, kg:0, up:false,
     tip:`New — aim ${ex.low}–${ex.high} reps`,
     msg:`First time at ${esc(locationName(locationId))} with ${variant.toLowerCase()} equipment — find a weight you can do for ${ex.low}–${ex.high} reps`};

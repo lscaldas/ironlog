@@ -60,8 +60,12 @@ document.querySelectorAll('#groupSeg .gchip').forEach(b=>b.onclick=()=>{
 const TIER_COLORS=['var(--tier-maintain)','var(--tier-build)','var(--tier-beast)'];
 function renderMuscleBars(mk){
   const rows=muscleEffective(mk);
+  const trained=new Set();
+  DB.exercises.filter(ex=>!ex.archived&&isGroupActive(focusGroupForExercise(ex),mk))
+    .forEach(ex=>exerciseContributions(ex).forEach(part=>trained.add(part.muscle)));
+  trained.forEach(muscle=>{ rows[muscle]||(rows[muscle]={muscle,eff:0,direct:0,inProgram:true}); });
   const order=MUSCLES.concat(['Other']);
-  const data=Object.values(rows).filter(r=>isGroupActive(MUSCLE_PPL[r.muscle]||'Other',mk)&&(r.inProgram||r.eff>0)).sort((a,b)=>{
+  const data=Object.values(rows).filter(r=>trained.has(r.muscle)||r.eff>0).sort((a,b)=>{
     const ia=order.indexOf(a.muscle), ib=order.indexOf(b.muscle);
     return (ia<0?99:ia)-(ib<0?99:ib)||a.muscle.localeCompare(b.muscle);
   });
@@ -131,8 +135,7 @@ document.getElementById('setupConfirmBtn').onclick=()=>{
 };
 
 function visibleExercises(mk){
-  const locationId=currentActiveWorkout()?.locationId;
-  return DB.exercises.filter(ex=>!ex.archived&&isGroupActive(focusGroupForExercise(ex),mk)&&(!locationId||!Array.isArray(ex.locations)||ex.locations.includes(locationId)));
+  return DB.exercises.filter(ex=>!ex.archived&&isGroupActive(focusGroupForExercise(ex),mk));
 }
 
 function renderWeek(){
@@ -142,8 +145,8 @@ function renderWeek(){
   document.getElementById('weekEmpty').style.display=visibleExercises(mk).length?'none':'block';
   const activeLocation=currentActiveWorkout();
   const programCount=DB.exercises.filter(e=>!e.archived).length;
-  document.getElementById('weekEmptyMessage').textContent=activeLocation&&programCount?`No exercises available at ${activeLocation.locationName||locationName(activeLocation.locationId)}.`:programCount?'No exercises in this week’s selected groups.':'No exercises in your program yet.';
-  document.getElementById('weekEmptyHint').textContent=activeLocation&&programCount?'Add an exercise here, or edit an exercise’s Available at setting.':programCount?'Change the weekly loadout to show another group.':'Add one above, or load the sample program from ⋯.';
+  document.getElementById('weekEmptyMessage').textContent=programCount?'No exercises in this week’s selected groups.':'No exercises in your program yet.';
+  document.getElementById('weekEmptyHint').textContent=programCount?'Change the weekly loadout to show another group.':'Add one above, or load the sample program from ⋯.';
   renderGroupChips();
   renderWeekSetup(mk);
   renderMuscleBars(mk);
@@ -179,7 +182,7 @@ function exCard(e,mk){
   // Keep the card compact: only this week's three latest sets are shown.
   const recentSets=sets.slice(-3);
   const best=bestSet(recentSets);
-  const chips=recentSets.map(s=>`<span class="wkchip ${best&&s.id===best.id&&recentSets.length>1?'best':''}"><b>${s.reps}</b>×${fmtW(s.kg)}<button class="editSet" type="button" data-sid="${esc(s.id)}" aria-label="Edit set ${s.reps} by ${fmtW(s.kg)}">Edit</button><button class="x" type="button" data-sid="${esc(s.id)}" aria-label="Remove set ${s.reps} by ${fmtW(s.kg)}">x</button></span>`).join('');
+  const chips=recentSets.map(s=>`<span class="wkchip ${best&&s.id===best.id&&recentSets.length>1?'best':''}">${s.mode==='quick'?'<b>Quick set</b>':`<b>${s.reps}</b>×${fmtW(s.kg)}<button class="editSet" type="button" data-sid="${esc(s.id)}" aria-label="Edit set ${s.reps} by ${fmtW(s.kg)}">Edit</button>`}<button class="x" type="button" data-sid="${esc(s.id)}" aria-label="Remove ${s.mode==='quick'?'quick set':`set ${s.reps} by ${fmtW(s.kg)}`}">x</button></span>`).join('');
   const contribChips=exerciseContributions(e).map(p=>`<span class="contrib ${p.primary?'primary':''}">+${fmtEff(p.weight)} ${esc(p.muscle)}</span>`).join('');
   const progressTip=sg.tip.replace(/\s*·\s*last [^·]+$/i,'').replace(/^Last [^·]+·\s*/i,'');
   const tip=progressTip+(e.notes?` · ${esc(e.notes)}`:'');
@@ -246,6 +249,7 @@ function setLogButtonsBusy(busy){
   document.getElementById('saveSetMoreBtn').disabled=busy;
 }
 function openLog(e){
+  PAST_LOGGING=false;
   ensureActiveWorkout("Workout started");
   renderWorkoutPanel();
   setLogButtonsBusy(false);
@@ -265,6 +269,7 @@ function openLog(e){
 }
 function exerciseById(id){ return DB.exercises.find(e=>e.id===id); }
 function openSetEdit(set){
+  PAST_LOGGING=false;
   const e=exerciseById(set.exId);
   if(!e){ toast("Exercise missing"); return; }
   setLogButtonsBusy(false);
@@ -346,6 +351,7 @@ function tierCrossToast(e,mk,before){
   return null;
 }
 document.getElementById('saveSetBtn').onclick=()=>{
+  if(PAST_LOGGING){ if(!appendPastDetailedSet()) setLogButtonsBusy(false); return; }
   if(editSetId){ if(doUpdateSet()){ closeSheets(); refreshAll(); toast("Set updated"); } else setLogButtonsBusy(false); return; }
   const e=logEx;
   const before=e?muscleEffective(thisWeek()):null;

@@ -68,6 +68,7 @@
   .form-hint{font-size:11.5px;color:var(--muted);margin:-4px 0 10px 2px;line-height:1.3;display:none;}
   .form-hint.show{display:block;}
   .form-hint b{color:var(--txt);font-weight:750;}
+  .form-hint button{margin-left:6px;padding:3px 8px;border:1px solid var(--line);border-radius:6px;background:var(--card2);color:var(--accent2);font:inherit;font-weight:700;cursor:pointer;}
   .ex-suggestions{display:flex;flex-wrap:wrap;gap:6px;margin:-3px 0 11px;}
   .ex-suggestions button{background:var(--card2);border:1px solid var(--line);color:var(--txt);border-radius:999px;
     padding:7px 9px;font-size:11.5px;font-weight:700;cursor:pointer;}
@@ -225,6 +226,20 @@
   .variant-tag{font-size:10px;color:var(--muted);font-weight:600;margin-left:5px;}
   .recovery-options{display:flex;gap:8px;margin:0 0 12px;}
   .recovery-options button{flex:1;background:var(--card2);border:1px solid var(--line);border-radius:9px;color:var(--txt);padding:9px;cursor:pointer;}
+  .recovery-options button.on{border-color:var(--accent);background:rgba(169,139,255,.16);color:var(--accent2);}
+  .past-exercise{padding:12px 0;border-bottom:1px solid var(--line);}
+  .past-exercise-name{font-weight:750;font-size:14px;margin-bottom:8px;}
+  .past-counts{display:flex;gap:7px;}
+  .past-quick-row{display:flex;align-items:center;justify-content:space-between;gap:6px;}
+  .past-quick-row .past-exercise-name{flex:1;min-width:0;margin:0;}
+  .past-counts{flex-shrink:0;gap:3px;}
+  .past-counts .past-count{min-width:34px;min-height:40px;padding:7px;border:1px solid var(--line);border-radius:9px;background:var(--card2);color:var(--txt);font-size:14px;font-weight:800;}
+  .past-counts .past-count.on{border-color:var(--accent);background:var(--accent);color:var(--on-accent);}
+  .past-detail-head{display:flex;align-items:center;justify-content:space-between;gap:8px;}
+  .past-detail-head .past-exercise-name{margin:0;}
+  .past-set-list{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;}
+  .past-set-chip{display:inline-flex;align-items:center;gap:5px;background:var(--card2);border:1px solid var(--line);border-radius:8px;padding:5px 8px;font-size:12px;}
+  .past-set-chip button{border:0;background:none;color:var(--muted);font-size:16px;padding:0 2px;}
   .gym-row{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:7px 0;border-bottom:1px solid var(--line);}
   .gym-row button{background:none;border:none;color:var(--accent);cursor:pointer;}
   .location-choices{display:flex;flex-wrap:wrap;gap:8px;}
