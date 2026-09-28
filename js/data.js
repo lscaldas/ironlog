@@ -103,7 +103,7 @@ function validateImportedDB(raw){
     if(set.generatedSample!==undefined&&typeof set.generatedSample!=='boolean') return {ok:false,message:"Invalid file"};
     const dateCheck=validateImportDate(set.date,set.ts);
     if(!dateCheck.ok) return dateCheck;
-    next.sets.push(Object.assign({}, set, {reps:reps.value, kg:kg.value, generatedSample:set.generatedSample===true}));
+    next.sets.push(Object.assign({}, set, {reps:reps.value, kg:kg.value, effort:set.effort||'hard', generatedSample:set.generatedSample===true}));
   }
 
   const knownSetIds=new Set(next.sets.map(s=>s.id));
@@ -230,6 +230,11 @@ document.getElementById('importFile').onchange=e=>{ const f=e.target.files[0]; i
     const incomingWorkoutCount=result.db.workouts.length;
     if(incomingSetCount===0&&!confirm(`This backup contains 0 sets and ${incomingWorkoutCount} workouts. No set history will be imported. If you expected a large history, cancel and export again from the old profile. Continue anyway?`)) return;
     const existingSetIds=new Set(DB.sets.map(set=>set.id));
+    const incomingWorkoutIds=new Set(result.db.workouts.map(workout=>workout.id));
+    DB.deletedSetIds=(DB.deletedSetIds||[]).filter(id=>!incomingSetIds.has(id));
+    DB.deletedWorkoutIds=(DB.deletedWorkoutIds||[]).filter(id=>!incomingWorkoutIds.has(id));
+    result.db.deletedSetIds=(result.db.deletedSetIds||[]).filter(id=>!incomingSetIds.has(id));
+    result.db.deletedWorkoutIds=(result.db.deletedWorkoutIds||[]).filter(id=>!incomingWorkoutIds.has(id));
     if(hasStoredProfile(ACTIVE_PROFILE)) saveRecoveryCopy();
     DB=mergeProfileData(DB,result.db);
     normalizeDB(); save();
