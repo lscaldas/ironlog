@@ -92,7 +92,7 @@ function validateImportedDB(raw){
     if(set.generatedSample!==undefined&&typeof set.generatedSample!=='boolean') return {ok:false,message:"Invalid file"};
     const dateCheck=validateImportDate(set.date,set.ts);
     if(!dateCheck.ok) return dateCheck;
-    next.sets.push(Object.assign({}, set, {reps:reps.value, kg:kg.value}));
+    next.sets.push(Object.assign({}, set, {reps:reps.value, kg:kg.value, generatedSample:set.generatedSample===true}));
   }
 
   const knownSetIds=new Set(next.sets.map(s=>s.id));
@@ -204,10 +204,31 @@ document.getElementById('removeSampleBtn').onclick=()=>{
   save(); refreshAll(); updateRecoveryUI(); updateSampleCleanupUI();
   toast(`${ids.size} sample sets removed`);
 };
-document.getElementById('exportBtn').onclick=()=>{ const b=new Blob([JSON.stringify(DB,null,2)],{type:'application/json'}); const a=document.createElement('a'); a.href=URL.createObjectURL(b); a.download='ironlog-'+todayKey()+'.json'; a.click(); toast("Exported ✓"); };
+document.getElementById('exportBtn').onclick=()=>{
+  const sets=DB.sets.map(set=>({...set,generatedSample:set.generatedSample===true}));
+  const exportInfo={format:'ironlog',version:1,exportedAt:new Date().toISOString(),counts:{exercises:DB.exercises.length,sets:sets.length,workouts:DB.workouts.length}};
+  const snapshot={...DB,sets,exportInfo};
+  const counts=exportInfo.counts;
+  const prompt=counts.sets===0
+    ? 'This profile currently contains 0 sets. If you expected workout history, cancel and load the Supabase-synced profile before exporting. Export this empty history anyway?'
+    : `This backup will contain ${counts.sets} sets across ${counts.workouts} workouts. Download it now?`;
+  if(!confirm(prompt)) return;
+  const b=new Blob([JSON.stringify(snapshot,null,2)],{type:'application/json'});
+  const a=document.createElement('a'); a.href=URL.createObjectURL(b); a.download='ironlog-'+todayKey()+'.json'; a.click();
+  setTimeout(()=>URL.revokeObjectURL(a.href),1000);
+  toast(`Exported ${counts.sets} sets · ${counts.workouts} workouts`);
+};
 document.getElementById('importBtn').onclick=()=>document.getElementById('importFile').click();
 document.getElementById('importFile').onchange=e=>{ const f=e.target.files[0]; if(!f)return; const r=new FileReader();
-  r.onload=()=>{ try{ const parsed=JSON.parse(r.result); const result=validateImportedDB(parsed); if(!result.ok){ toast(result.message||"Invalid file"); return; } DB=result.db; normalizeDB(); save(); rememberSession('local'); refreshAll(); closeSheets(); toast("Imported ✓"); }catch(_){ toast("Could not read file"); } finally{ e.target.value=''; } }; r.readAsText(f); };
+  r.onload=()=>{ try{
+    const result=validateImportedDB(JSON.parse(r.result));
+    if(!result.ok){ toast(result.message||"Invalid file"); return; }
+    const setCount=result.db.sets.length,workoutCount=result.db.workouts.length;
+    if(!confirm(setCount===0?`This backup contains 0 sets and ${workoutCount} workouts. No set history will be imported. Continue anyway?`:`This backup contains ${setCount} sets and ${workoutCount} workouts. Replace this profile with the backup?`)) return;
+    DB=result.db; normalizeDB(); save(); rememberSession('local'); refreshAll(); closeSheets();
+    const hidden=DB.sets.filter(set=>set.generatedSample===true).length;
+    toast(hidden?`Imported ${setCount} sets · ${hidden} sample sets hidden`:`Imported ${setCount} sets ✓`);
+  }catch(_){ toast("Could not read file"); } finally{ e.target.value=''; } }; r.readAsText(f); };
 document.getElementById('seedBtn').onclick=()=>{ seed(); closeSheets(); toast("Program loaded 📋"); };
 document.getElementById('logoutBtn').onclick=()=>logout();
 document.getElementById('wipeBtn').onclick=()=>{ if(confirm("Erase ALL data? Cannot be undone.")){ DB=blankDB(); DB.initialized=true; save(); refreshAll(); document.getElementById('importBtn').scrollIntoView({block:'center'}); toast("Erased"); } };

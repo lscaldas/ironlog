@@ -9,6 +9,7 @@ function sampleSetCreationTime(id){
 }
 function detectGeneratedSampleSets(sets){
   const candidates=sets.filter(set=>{
+    if(set.generatedSample!==undefined) return false;
     if(set.workoutId||!Number.isFinite(set.ts)||typeof set.date!=='string'||!/^\d{4}-\d{2}-\d{2}$/.test(set.date)) return false;
     const midnight=new Date(set.date+'T00:00:00').getTime();
     return set.ts>=midnight&&set.ts<midnight+60000&&Number.isFinite(sampleSetCreationTime(set.id));
