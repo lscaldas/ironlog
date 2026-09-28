@@ -4,6 +4,8 @@ function esc(s){ return (s||"").replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>
 function normalizeDB(){
   let dirty=false;
   if(DB.schemaVersion!==6){ DB.schemaVersion=6; dirty=true; }
+  const userSettings=normalizeUserSettings(DB.userSettings);
+  if(JSON.stringify(userSettings)!==JSON.stringify(DB.userSettings)){ DB.userSettings=userSettings; dirty=true; }
   if(!Array.isArray(DB.gyms)){ DB.gyms=[]; dirty=true; }
   if(DB.initialized!==true && (DB.exercises?.length||DB.sets?.length)){ DB.initialized=true; dirty=true; }
   if(!Array.isArray(DB.exercises)){ DB.exercises=[]; dirty=true; }
@@ -163,6 +165,6 @@ document.addEventListener('visibilitychange',()=>{
 
 if('serviceWorker' in navigator){
   window.addEventListener('load',()=>{
-    navigator.serviceWorker.register('./sw.js?v=48').then(reg=>reg.update()).catch(()=>{});
+    navigator.serviceWorker.register('./sw.js?v=50').then(reg=>reg.update()).catch(()=>{});
   });
 }

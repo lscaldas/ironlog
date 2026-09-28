@@ -8,7 +8,7 @@ function addWeeks(mk,n){ const d=new Date(mk+"T00:00:00"); d.setDate(d.getDate()
 function statWeeks(){
   if(RW<999) return weekList(Math.min(RW,52));
   const current=thisWeek();
-  const logged=recordedSets().map(s=>mondayOf(s.date)).sort();
+  const logged=recordedSets().filter(countsTowardVolume).map(s=>mondayOf(s.date)).sort();
   const start=logged[0]&&logged[0]<current ? logged[0] : current;
   const out=[];
   for(let mk=start; mk<=current; mk=addWeeks(mk,1)) out.push(mk);
@@ -28,6 +28,9 @@ function renderStats(){
   document.getElementById('aHit').textContent=(weeks.length?Math.round(hitSum/weeks.length*100):0)+"%";
 
   drawVolumeCharts(weeks);
+  requestAnimationFrame(()=>document.querySelectorAll('#v-stats .chart-scroll').forEach(scroller=>{
+    scroller.scrollLeft=scroller.scrollWidth;
+  }));
   // best-set progress per exercise
   const pl=document.getElementById('progList');
   const rows=DB.exercises.flatMap(e=>{

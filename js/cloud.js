@@ -125,7 +125,7 @@ function mergeProfileData(local,remote){
   return {...remote,...local,initialized:true,schemaVersion:6,gyms,exercises,
     sets:sets.filter(set=>!deletedSets.has(set.id)),
     workouts:workouts.filter(workout=>!deletedWorkouts.has(workout.id)).map(workout=>({...workout,setIds:workout.setIds.filter(id=>!deletedSets.has(id))})),
-    deletedSetIds,deletedWorkoutIds,activeWorkout,
+    deletedSetIds,deletedWorkoutIds,activeWorkout,userSettings:mergeUserSettings(local.userSettings,remote.userSettings),
     weekPlans:{...(remote.weekPlans||{}),...(local.weekPlans||{})}};
 }
 async function loadCloudProfile(opts={}){

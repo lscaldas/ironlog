@@ -65,7 +65,7 @@ function renderMuscleBars(mk){
     .forEach(ex=>exerciseContributions(ex).forEach(part=>trained.add(part.muscle)));
   trained.forEach(muscle=>{ rows[muscle]||(rows[muscle]={muscle,eff:0,direct:0,inProgram:true}); });
   const order=MUSCLES.concat(['Other']);
-  const data=Object.values(rows).filter(r=>trained.has(r.muscle)||r.eff>0).sort((a,b)=>{
+  const data=Object.values(rows).filter(r=>trained.has(r.muscle)).sort((a,b)=>{
     const ia=order.indexOf(a.muscle), ib=order.indexOf(b.muscle);
     return (ia<0?99:ia)-(ib<0?99:ib)||a.muscle.localeCompare(b.muscle);
   });

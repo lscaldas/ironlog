@@ -13,7 +13,19 @@ function sanitizeProfileId(s){
     .slice(0,32);
 }
 function blankDB(){
-  return {schemaVersion:6,initialized:false,exercises:[],sets:[],workouts:[],activeWorkout:null,weekPlans:{},gyms:[],deletedSetIds:[],deletedWorkoutIds:[]};
+  return {schemaVersion:6,initialized:false,exercises:[],sets:[],workouts:[],activeWorkout:null,weekPlans:{},gyms:[],deletedSetIds:[],deletedWorkoutIds:[],userSettings:{bodyweightKg:null,standardsSex:'',pbPromptDismissed:false,updatedAt:0}};
+}
+function normalizeUserSettings(value){
+  const source=value&&typeof value==='object'&&!Array.isArray(value)?value:{};
+  const rawWeight=source.bodyweightKg;
+  const bodyweightKg=typeof rawWeight==='number'&&Number.isFinite(rawWeight)&&rawWeight>=30&&rawWeight<=300?Math.round(rawWeight*100)/100:null;
+  const standardsSex=['male','female'].includes(source.standardsSex)?source.standardsSex:'';
+  const updatedAt=typeof source.updatedAt==='number'&&Number.isFinite(source.updatedAt)&&source.updatedAt>=0?source.updatedAt:0;
+  return {bodyweightKg,standardsSex,pbPromptDismissed:source.pbPromptDismissed===true,updatedAt};
+}
+function mergeUserSettings(local,remote){
+  const localSettings=normalizeUserSettings(local),remoteSettings=normalizeUserSettings(remote);
+  return localSettings.updatedAt>=remoteSettings.updatedAt?localSettings:remoteSettings;
 }
 function profileKeyFor(profile){ return KEY_PREFIX+profile; }
 function profileKey(){ return profileKeyFor(ACTIVE_PROFILE); }

@@ -42,7 +42,7 @@ function mergeProfileData(local,remote){
   (Array.isArray(local.workouts)?local.workouts:[]).forEach(w=>{
     const index=workoutIds.get(w.id);
     const previous=index===undefined?null:workouts[index];
-    const mapped={...w,locationId:mapGym(w.locationId),setIds:[...new Set([...(previous?.setIds||[]),...(w.setIds||[])])]};
+    const mapped={...w,locationId:mapGym(w.locationId),setIds:w.replaceSetIds===true?[...(w.setIds||[])]:[...new Set([...(previous?.setIds||[]),...(w.setIds||[])])],replaceSetIds:false};
     if(index!==undefined) workouts[index]=mapped;
     else { workoutIds.set(w.id,workouts.length); workouts.push(mapped); }
   });
@@ -51,14 +51,15 @@ function mergeProfileData(local,remote){
   return {...remote,...local,initialized:true,schemaVersion:6,gyms,exercises,
     sets:sets.filter(set=>!deletedSets.has(set.id)),
     workouts:workouts.filter(workout=>!deletedWorkouts.has(workout.id)).map(workout=>({...workout,setIds:workout.setIds.filter(id=>!deletedSets.has(id))})),
-    deletedSetIds,deletedWorkoutIds,activeWorkout,
+    deletedSetIds,deletedWorkoutIds,activeWorkout,userSettings:mergeUserSettings(local.userSettings,remote.userSettings),
     weekPlans:{...(remote.weekPlans||{}),...(local.weekPlans||{})}};
 }
 
 function seed(){
   markDeletedRecords(DB.sets.map(set=>set.id),DB.workouts.map(workout=>workout.id).concat(DB.activeWorkout?.id||[]));
   const deletedSetIds=DB.deletedSetIds,deletedWorkoutIds=DB.deletedWorkoutIds;
+  const userSettings=normalizeUserSettings(DB.userSettings);
   DB={schemaVersion:6,initialized:true,exercises:SEED.map(s=>({id:uid('e'),...s,variant:variantOf(s)})),
-    sets:[],workouts:[],activeWorkout:null,weekPlans:{},gyms:[],deletedSetIds,deletedWorkoutIds};
+    sets:[],workouts:[],activeWorkout:null,weekPlans:{},gyms:[],deletedSetIds,deletedWorkoutIds,userSettings};
   save(); refreshAll();
 }

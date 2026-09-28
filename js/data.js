@@ -38,6 +38,14 @@ function validateImportedDB(raw){
   if(raw.activeWorkout!==undefined&&raw.activeWorkout!==null&&!isPlainObject(raw.activeWorkout)) return {ok:false,message:"Invalid file"};
   if(raw.weekPlans!==undefined&&!isPlainObject(raw.weekPlans)) return {ok:false,message:"Invalid file"};
   if(raw.gyms!==undefined&&!Array.isArray(raw.gyms)) return {ok:false,message:"Invalid file"};
+  if(raw.userSettings!==undefined){
+    if(!isPlainObject(raw.userSettings)) return {ok:false,message:"Invalid file"};
+    const settings=raw.userSettings;
+    if(settings.bodyweightKg!==undefined&&settings.bodyweightKg!==null&&!importNumber(settings.bodyweightKg,{min:30,max:300,decimals:2}).ok) return {ok:false,message:"Invalid file"};
+    if(settings.standardsSex!==undefined&&!['','male','female'].includes(settings.standardsSex)) return {ok:false,message:"Invalid file"};
+    if(settings.pbPromptDismissed!==undefined&&typeof settings.pbPromptDismissed!=='boolean') return {ok:false,message:"Invalid file"};
+    if(settings.updatedAt!==undefined&&(typeof settings.updatedAt!=='number'||!Number.isFinite(settings.updatedAt)||settings.updatedAt<0)) return {ok:false,message:"Invalid file"};
+  }
   for(const key of ['deletedSetIds','deletedWorkoutIds']){
     if(raw[key]!==undefined&&(!Array.isArray(raw[key])||raw[key].some(id=>typeof id!=='string'||!id))) return {ok:false,message:"Invalid file"};
   }

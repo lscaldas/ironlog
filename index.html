@@ -20,7 +20,7 @@ if(location.hostname==='ironlog-43233.web.app'){
   }catch(_){ /* Keep this origin available for JSON export. */ }
 }
 </script>
-<link rel="stylesheet" href="styles.css?v=48">
+<link rel="stylesheet" href="styles.css?v=50">
 </head>
 <body>
 <div class="gate" id="profileGate">
@@ -88,7 +88,7 @@ if(location.hostname==='ironlog-43233.web.app'){
 
   <!-- ===== HISTORY ===== -->
   <section class="view" id="v-history">
-    <div class="card-h" style="padding:0 4px;align-items:center;"><h2 style="font-size:17px;">History</h2><div class="row" style="align-items:center;gap:10px;"><div class="sub" id="histCount"></div><button class="ghost btn-sm" id="addPastWorkoutBtn" type="button">＋ Past workout</button></div></div>
+    <div class="card-h" style="padding:0 4px;align-items:center;"><h2 style="font-size:17px;">History</h2><div class="row history-head-actions" style="align-items:center;gap:8px;"><div class="sub" id="histCount"></div><button class="ghost btn-sm" id="joinWorkoutsBtn" type="button">Join workouts</button><button class="ghost btn-sm" id="cancelJoinWorkoutsBtn" type="button" hidden>Cancel</button><button class="ghost btn-sm" id="addPastWorkoutBtn" type="button">＋ Past workout</button></div></div>
     <div id="histList"></div>
     <div class="empty" id="histEmpty"><div class="big">📅</div><div>No sets logged yet.</div></div>
   </section>
@@ -131,6 +131,19 @@ if(location.hostname==='ironlog-43233.web.app'){
   <!-- ===== PERSONAL BESTS ===== -->
   <section class="view" id="v-personalBest">
     <div class="card-h" style="padding:0 4px;margin-bottom:10px;align-items:flex-start;"><div><h2 style="font-size:17px;">Personal bests</h2><div class="sub">Your best ever set for each exercise · weight first, then reps</div></div></div>
+    <div class="card pb-standards-help" id="pbStandardsHelp" hidden>
+      <div class="card-h"><h2 id="pbStandardsTitle">Strength badges</h2><button class="ghost btn-sm" id="pbOpenSettings" type="button">Set profile</button></div>
+      <p class="h3sub" id="pbStandardsMessage">Add your body weight and standards profile to see strength badges.</p>
+      <div id="pbFirstVisitSetup" hidden>
+        <div class="row">
+          <div class="field"><label for="pbSetupSex">Gender for strength standards</label><select id="pbSetupSex"><option value="">Choose</option><option value="male">Male</option><option value="female">Female</option></select></div>
+          <div class="field"><label for="pbSetupWeight">Body weight (kg)</label><input id="pbSetupWeight" type="number" inputmode="decimal" min="30" max="300" step="0.1" placeholder="e.g. 72.5"></div>
+        </div>
+        <div class="pb-control-row"><button class="ghost" id="pbSetupSkip" type="button">Maybe later</button><button class="btn" id="pbSetupSave" type="button">Save and show badges</button></div>
+        <p class="settings-help">This is used only for strength badges. You can change it any time in Settings.</p>
+      </div>
+      <p class="settings-help">Standards source: <a href="https://strengthlevel.com/strength-standards" target="_blank" rel="noopener">StrengthLevel</a>.</p>
+    </div>
     <div class="card pb-share-controls">
       <div class="card-h"><h2>Share your results</h2><div class="sub" id="pbSelectedCount">0 selected</div></div>
       <p class="h3sub">Choose which results to include. Machine results stay separate by gym.</p>
@@ -232,7 +245,7 @@ if(location.hostname==='ironlog-43233.web.app'){
     <button class="sheet-close" id="cancelExBtn" type="button" title="Cancel">x</button>
   </div>
   <p class="h3sub">Every set feeds the muscle bars — no per-exercise quota. Double progression: hit the top of your rep range, then add weight.</p>
-  <button class="btn" id="saveExBtn" type="button">Save exercise</button>
+  <button class="btn" id="saveExBtn" type="button" style="margin-bottom:16px;">Save exercise</button>
   <input id="fMuscle" type="hidden">
   <input id="fArea" type="hidden">
   <div class="field">
@@ -281,6 +294,14 @@ if(location.hostname==='ironlog-43233.web.app'){
     <p class="h3sub" id="cloudHelp" style="margin:10px 0 0;">Sign in with Google to sync. Signing out does not delete the Google account’s cloud workouts.</p>
     <p class="settings-help">Sign in merges this profile with Google sync. <strong>Sync now</strong> sends pending changes; <strong>Sign out</strong> removes this account from the device without deleting its cloud data.</p>
   </div>
+  <div class="card" id="strengthProfileSettings" style="box-shadow:none;margin-bottom:10px;">
+    <div class="card-h"><h2>Strength badge profile</h2></div>
+    <p class="h3sub">Used only to compare your Personal Bests with bodyweight-based strength standards. Changes save automatically.</p>
+    <div class="row">
+      <div class="field"><label for="standardsSex">Gender for strength standards</label><select id="standardsSex"><option value="">Choose</option><option value="male">Male</option><option value="female">Female</option></select></div>
+      <div class="field"><label for="bodyweightKg">Body weight (kg)</label><input id="bodyweightKg" type="number" inputmode="decimal" min="30" max="300" step="0.1" placeholder="e.g. 72.5"></div>
+    </div>
+  </div>
   <div class="settings-action"><button class="ghost" id="exportBtn" type="button">⬇️ Export data (JSON)</button><p class="settings-help">Downloads a backup of this profile’s exercises, workouts, gyms, and settings.</p></div>
   <div class="card" id="recoveryCopies" hidden style="box-shadow:none;margin-bottom:10px;">
     <div class="card-h"><h2>Saved local copies</h2></div>
@@ -300,17 +321,17 @@ if(location.hostname==='ironlog-43233.web.app'){
 
 <div class="toast" id="toast"></div>
 
-<script src="firebase-config.js?v=48"></script>
-<script src="js/storage.js?v=48"></script>
-<script src="js/catalog-data.js?v=48"></script>
-<script src="js/helpers.js?v=48"></script>
-<script src="js/week.js?v=48"></script>
-<script src="js/exercises.js?v=48"></script>
-<script src="js/stats.js?v=48"></script>
-<script src="js/personal-best.js?v=48"></script>
-<script src="js/merge.js?v=48"></script>
-<script src="js/data.js?v=48"></script>
-<script src="js/firebase-cloud.js?v=48"></script>
-<script src="js/init.js?v=48"></script>
+<script src="firebase-config.js?v=50"></script>
+<script src="js/storage.js?v=50"></script>
+<script src="js/catalog-data.js?v=50"></script>
+<script src="js/helpers.js?v=50"></script>
+<script src="js/week.js?v=50"></script>
+<script src="js/exercises.js?v=50"></script>
+<script src="js/stats.js?v=50"></script>
+<script src="js/personal-best.js?v=50"></script>
+<script src="js/merge.js?v=50"></script>
+<script src="js/data.js?v=50"></script>
+<script src="js/firebase-cloud.js?v=50"></script>
+<script src="js/init.js?v=50"></script>
 </body>
 </html>

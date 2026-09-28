@@ -142,8 +142,10 @@ function currentActiveWorkout(){
 }
 function setsForWorkout(w){
   if(!w) return [];
-  const ids=new Set(w.setIds||[]);
-  return recordedSets().filter(s=>s.workoutId===w.id||ids.has(s.id)).sort((a,b)=>a.ts-b.ts);
+  const parts=[w,...(Array.isArray(w.joinedWorkoutParts)?w.joinedWorkoutParts:[])];
+  const workoutIds=new Set(parts.map(part=>part.id));
+  const ids=new Set(parts.flatMap(part=>Array.isArray(part.setIds)?part.setIds:[]));
+  return recordedSets().filter(s=>workoutIds.has(s.workoutId)||ids.has(s.id)).sort((a,b)=>a.ts-b.ts);
 }
 function workoutTime(ms){
   return new Date(ms).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
@@ -228,11 +230,13 @@ function completeActiveWorkout(endedAt=Date.now(),quiet=false){
 function deleteCompletedWorkout(id){
   const w=DB.workouts.find(x=>x.id===id&&x.status==='completed');
   if(!w){ toast("Workout not found"); return; }
-  if(!confirm("Delete this completed workout? This removes its logged sets and cannot be undone.")) return;
-  const ids=new Set((w.setIds||[]).concat(DB.sets.filter(s=>s.workoutId===id).map(s=>s.id)));
-  markDeletedRecords([...ids],[id]);
+  const parts=Array.isArray(w.joinedWorkoutParts)?w.joinedWorkoutParts:[w];
+  if(!confirm(`Delete this completed workout${parts.length>1?` and its ${parts.length-1} joined session${parts.length===2?'':'s'}`:''}? This removes its logged sets and cannot be undone.`)) return;
+  const workoutIds=new Set(parts.map(part=>part.id));
+  const ids=new Set(parts.flatMap(part=>part.setIds||[]).concat(DB.sets.filter(s=>workoutIds.has(s.workoutId)).map(s=>s.id)));
+  markDeletedRecords([...ids],[...workoutIds]);
   DB.sets=DB.sets.filter(s=>!ids.has(s.id));
-  DB.workouts=DB.workouts.filter(x=>x.id!==id);
+  DB.workouts=DB.workouts.filter(x=>!workoutIds.has(x.id));
   save();
   refreshAll();
   toast("Workout deleted");
@@ -312,6 +316,7 @@ function suggest(ex,context={}){
 /* ================= View switching ================= */
 const views={week:"v-week",history:"v-history",stats:"v-stats",personalBest:"v-personalBest",catalog:"v-catalog"};
 document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>{
+  if(b.dataset.view!=='history'&&HISTORY_JOIN_MODE) cancelWorkoutJoin();
   document.querySelectorAll('nav button').forEach(x=>x.classList.remove('on')); b.classList.add('on');
   Object.values(views).forEach(id=>document.getElementById(id).classList.remove('active'));
   document.getElementById(views[b.dataset.view]).classList.add('active');

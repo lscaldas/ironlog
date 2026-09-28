@@ -225,9 +225,56 @@ function renderCatalog(){
 document.getElementById('catalogSearch').oninput=renderCatalog;
 
 /* ================= HISTORY ================= */
+let HISTORY_JOIN_MODE=false;
+let HISTORY_JOIN_SELECTED=new Set();
+function workoutJoinKey(workout){
+  return `${workout.date||dateKey(new Date(workout.startedAt))}|${workout.locationId||'home'}`;
+}
+function cancelWorkoutJoin(){
+  HISTORY_JOIN_MODE=false;
+  HISTORY_JOIN_SELECTED.clear();
+}
+function undoWorkoutJoin(id){
+  const primary=DB.workouts.find(w=>w.id===id&&Array.isArray(w.joinedWorkoutParts));
+  if(!primary) return;
+  const parts=primary.joinedWorkoutParts;
+  if(!confirm(`Split this back into ${parts.length} original workout sessions? All sets and workout details will stay in your history.`)) return;
+  parts.forEach(snapshot=>{
+    const workout=DB.workouts.find(w=>w.id===snapshot.id);
+    if(!workout) return;
+    Object.keys(workout).forEach(key=>delete workout[key]);
+    Object.assign(workout,snapshot,{joinedWorkoutParts:null,mergedInto:null,replaceSetIds:true});
+  });
+  save(); refreshAll(); toast(`Restored ${parts.length} workout sessions`);
+}
+function mergeSelectedWorkouts(){
+  const chosen=DB.workouts.filter(w=>HISTORY_JOIN_SELECTED.has(w.id)&&w.status==='completed');
+  if(chosen.length<2){ toast('Select at least two workouts'); return; }
+  if(chosen.some(w=>Array.isArray(w.joinedWorkoutParts))){ toast('Undo an existing join before joining that session again'); return; }
+  if(new Set(chosen.map(workoutJoinKey)).size!==1){ toast('Choose workouts from the same day and gym'); return; }
+  const date=chosen[0].date||dateKey(new Date(chosen[0].startedAt));
+  if(!confirm(`Join ${chosen.length} workout sessions from ${fmtDate(date)}? All logged sets and their individual times will be kept.`)) return;
+  chosen.sort((a,b)=>(a.startedAt||0)-(b.startedAt||0));
+  const [primary,...merged]=chosen;
+  const snapshots=chosen.map(w=>({...w,setIds:[...(w.setIds||[])],joinedWorkoutParts:null,mergedInto:null}));
+  const sets=chosen.flatMap(w=>setsForWorkout(w)).filter((set,index,all)=>all.findIndex(other=>other.id===set.id)===index);
+  primary.joinedWorkoutParts=snapshots;
+  merged.forEach(w=>{ w.mergedInto=primary.id; });
+  primary.startedAt=Math.min(...chosen.map(w=>w.startedAt||Date.now()));
+  primary.endedAt=Math.max(...chosen.map(w=>w.endedAt||w.startedAt||Date.now()));
+  primary.date=date;
+  cancelWorkoutJoin(); save(); refreshAll();
+  toast(`Joined ${chosen.length} sessions · ${sets.length} sets kept · Undo join available`);
+}
+document.getElementById('joinWorkoutsBtn').onclick=()=>{
+  if(HISTORY_JOIN_MODE){ mergeSelectedWorkouts(); return; }
+  HISTORY_JOIN_MODE=true; HISTORY_JOIN_SELECTED.clear(); renderHistory();
+  toast('Select 2 or more sessions from the same day and gym');
+};
+document.getElementById('cancelJoinWorkoutsBtn').onclick=()=>{ cancelWorkoutJoin(); renderHistory(); };
 function renderHistory(){
   const nameOf=id=>(DB.exercises.find(e=>e.id===id)||{}).name||'(removed)';
-  const completed=DB.workouts.filter(w=>w.status==='completed').sort((a,b)=>(b.date||'').localeCompare(a.date||'')||(b.createdAt||b.endedAt||b.startedAt)-(a.createdAt||a.endedAt||a.startedAt));
+  const completed=DB.workouts.filter(w=>w.status==='completed'&&!w.mergedInto).sort((a,b)=>(b.date||'').localeCompare(a.date||'')||(b.createdAt||b.endedAt||b.startedAt)-(a.createdAt||a.endedAt||a.startedAt));
   const active=currentActiveWorkout();
   const activeSets=setsForWorkout(active);
   const shownSetIds=new Set(completed.flatMap(w=>setsForWorkout(w).map(s=>s.id)).concat(activeSets.map(s=>s.id)));
@@ -236,6 +283,12 @@ function renderHistory(){
   legacySets.forEach(s=>{(byDay[s.date]=byDay[s.date]||[]).push(s);});
   const days=Object.keys(byDay).sort().reverse();
   const totalEntries=completed.length+days.length+(activeSets.length?1:0);
+  const joinButton=document.getElementById('joinWorkoutsBtn');
+  const cancelJoinButton=document.getElementById('cancelJoinWorkoutsBtn');
+  joinButton.hidden=!HISTORY_JOIN_MODE&&completed.length<2;
+  joinButton.textContent=HISTORY_JOIN_MODE?`Merge selected (${HISTORY_JOIN_SELECTED.size})`:'Join workouts';
+  joinButton.disabled=HISTORY_JOIN_MODE&&HISTORY_JOIN_SELECTED.size<2;
+  cancelJoinButton.hidden=!HISTORY_JOIN_MODE;
   document.getElementById('histEmpty').style.display=totalEntries?'none':'block';
   const recordedCount=recordedSets().length;
   document.getElementById('histCount').textContent=recordedCount?`${recordedCount} logged set${recordedCount===1?'':'s'}`:'';
@@ -253,12 +306,12 @@ function renderHistory(){
     const label=`${inProgress?'Workout in progress':'Completed workout session'} ${relDay(w.date||dateKey(new Date(w.startedAt)))} ${sets.length} set${sets.length===1?'':'s'}`;
     const sessionSort=inProgress?Date.now():new Date((w.date||dateKey(new Date(w.startedAt)))+'T00:00:00').getTime()+((w.createdAt||w.endedAt||w.startedAt)%86400000)/86400000;
     const duration=w.pastEntry?'past workout':`duration ${workoutDuration(w.startedAt,w.endedAt||w.startedAt)}`;
-    return `<div class="day session" data-wid="${esc(w.id)}" data-sort="${sessionSort}">
+    return `<div class="day session${HISTORY_JOIN_SELECTED.has(w.id)?' join-selected':''}" data-wid="${esc(w.id)}" data-sort="${sessionSort}">
       <button class="session-row day-h" type="button" aria-expanded="false" aria-label="${esc(label)}">
         <div><div class="day-date">${inProgress?'Workout in progress':'Completed workout session'}</div>
         <div class="day-sum">${relDay(w.date||dateKey(new Date(w.startedAt)))} · ${esc(w.locationName||locationName(w.locationId||'home'))} · ${duration} · ${sets.length} set${sets.length===1?'':'s'} · ${Object.keys(byEx).length} exercise${Object.keys(byEx).length===1?'':'s'}</div></div><span class="chev">›</span>
       </button>
-      ${inProgress?'':'<div class="session-actions"><button class="ghost btn-sm deleteWorkoutBtn" type="button">Delete</button></div>'}
+      ${inProgress?'':`<div class="session-actions">${HISTORY_JOIN_MODE?(w.joinedWorkoutParts?'<button class="ghost btn-sm" type="button" disabled title="Undo this join before selecting it">Undo join first</button>':`<button class="ghost btn-sm join-select-btn" type="button" data-wid="${esc(w.id)}" aria-pressed="${HISTORY_JOIN_SELECTED.has(w.id)}" ${HISTORY_JOIN_SELECTED.size&&![...HISTORY_JOIN_SELECTED].some(id=>workoutJoinKey(DB.workouts.find(item=>item.id===id)||{})===workoutJoinKey(w))?'disabled title="Choose workouts from the same day and gym"':''}>${HISTORY_JOIN_SELECTED.has(w.id)?'Selected':'Select'}</button>`):`${w.joinedWorkoutParts?`<button class="ghost btn-sm undoWorkoutJoinBtn" type="button" data-wid="${esc(w.id)}">Undo join</button>`:''}`}<button class="ghost btn-sm deleteWorkoutBtn" type="button" ${HISTORY_JOIN_MODE?'disabled':''}>Delete</button></div>`}
       <div class="day-body">${rows||'<div class="sub">No sets saved in this workout.</div>'}</div>
     </div>`;
   }).join('');
@@ -295,6 +348,18 @@ function renderHistory(){
       e.stopPropagation();
       const set=DB.sets.find(s=>s.id===btn.dataset.sid);
       if(set) openSetEdit(set); else toast("Set not found");
+    };
+  });
+  document.querySelectorAll('#histList .undoWorkoutJoinBtn').forEach(btn=>{
+    btn.onclick=e=>{ e.stopPropagation(); undoWorkoutJoin(btn.dataset.wid); };
+  });
+  document.querySelectorAll('#histList .join-select-btn').forEach(btn=>{
+    btn.onclick=e=>{
+      e.stopPropagation();
+      const id=btn.dataset.wid;
+      if(HISTORY_JOIN_SELECTED.has(id)) HISTORY_JOIN_SELECTED.delete(id);
+      else HISTORY_JOIN_SELECTED.add(id);
+      renderHistory();
     };
   });
 document.querySelectorAll('#histList .historyRemoveSet').forEach(btn=>{

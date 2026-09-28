@@ -26,6 +26,7 @@
       ".github/**",
       ".claude/**",
       ".gstack/**",
+      "tools/**",
       ".transcription_crops/**",
       "**/node_modules/**",
       "tests/**",
