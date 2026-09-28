@@ -228,10 +228,7 @@ document.getElementById('importFile').onchange=e=>{ const f=e.target.files[0]; i
     const incomingSetIds=new Set(result.db.sets.map(set=>set.id));
     const incomingSetCount=incomingSetIds.size;
     const incomingWorkoutCount=result.db.workouts.length;
-    const prompt=incomingSetCount===0
-      ? `This backup contains 0 sets and ${incomingWorkoutCount} workouts. No set history will be imported. If you expected a large history, cancel and export again from the old profile. Continue anyway?`
-      : `This backup contains ${incomingSetCount} sets and ${incomingWorkoutCount} workouts. Merge this history into the current profile?`;
-    if(!confirm(prompt)) return;
+    if(incomingSetCount===0&&!confirm(`This backup contains 0 sets and ${incomingWorkoutCount} workouts. No set history will be imported. If you expected a large history, cancel and export again from the old profile. Continue anyway?`)) return;
     const existingSetIds=new Set(DB.sets.map(set=>set.id));
     if(hasStoredProfile(ACTIVE_PROFILE)) saveRecoveryCopy();
     DB=mergeProfileData(DB,result.db);
