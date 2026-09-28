@@ -235,6 +235,10 @@ document.getElementById('importFile').onchange=e=>{ const f=e.target.files[0]; i
     DB.deletedWorkoutIds=(DB.deletedWorkoutIds||[]).filter(id=>!incomingWorkoutIds.has(id));
     result.db.deletedSetIds=(result.db.deletedSetIds||[]).filter(id=>!incomingSetIds.has(id));
     result.db.deletedWorkoutIds=(result.db.deletedWorkoutIds||[]).filter(id=>!incomingWorkoutIds.has(id));
+    // An explicit backup import is a restore operation, even when another device
+    // previously synced deletion markers for these same records.
+    result.db.importRestoreSetIds=[...incomingSetIds];
+    result.db.importRestoreWorkoutIds=[...incomingWorkoutIds];
     if(hasStoredProfile(ACTIVE_PROFILE)) saveRecoveryCopy();
     DB=mergeProfileData(DB,result.db);
     normalizeDB(); save();

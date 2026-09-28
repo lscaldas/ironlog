@@ -5,8 +5,10 @@ function starterExerciseKey(ex){
   return normName(ex.name)+'|'+variantOf(ex);
 }
 function mergeProfileData(local,remote){
-  const deletedSetIds=[...new Set([...(remote.deletedSetIds||[]),...(local.deletedSetIds||[])])];
-  const deletedWorkoutIds=[...new Set([...(remote.deletedWorkoutIds||[]),...(local.deletedWorkoutIds||[])])];
+  const importRestoreSetIds=new Set([...(remote.importRestoreSetIds||[]),...(local.importRestoreSetIds||[])]);
+  const importRestoreWorkoutIds=new Set([...(remote.importRestoreWorkoutIds||[]),...(local.importRestoreWorkoutIds||[])]);
+  const deletedSetIds=[...new Set([...(remote.deletedSetIds||[]),...(local.deletedSetIds||[])])].filter(id=>!importRestoreSetIds.has(id));
+  const deletedWorkoutIds=[...new Set([...(remote.deletedWorkoutIds||[]),...(local.deletedWorkoutIds||[])])].filter(id=>!importRestoreWorkoutIds.has(id));
   const deletedSets=new Set(deletedSetIds),deletedWorkouts=new Set(deletedWorkoutIds);
   const localGyms=Array.isArray(local.gyms)?local.gyms:[];
   const remoteGyms=Array.isArray(remote.gyms)?remote.gyms:[];
@@ -48,11 +50,16 @@ function mergeProfileData(local,remote){
   });
   const active=local.activeWorkout||remote.activeWorkout;
   const activeWorkout=active&&!workoutIds.has(active.id)&&!deletedWorkouts.has(active.id)?{...active,locationId:mapGym(active.locationId),setIds:(active.setIds||[]).filter(id=>!deletedSets.has(id))}:null;
-  return {...remote,...local,initialized:true,schemaVersion:6,gyms,exercises,
+  const merged={...remote,...local,initialized:true,schemaVersion:6,gyms,exercises,
     sets:sets.filter(set=>!deletedSets.has(set.id)),
     workouts:workouts.filter(workout=>!deletedWorkouts.has(workout.id)).map(workout=>({...workout,setIds:workout.setIds.filter(id=>!deletedSets.has(id))})),
     deletedSetIds,deletedWorkoutIds,activeWorkout,userSettings:mergeUserSettings(local.userSettings,remote.userSettings),
     weekPlans:{...(remote.weekPlans||{}),...(local.weekPlans||{})}};
+  if(importRestoreSetIds.size) merged.importRestoreSetIds=[...importRestoreSetIds];
+  else delete merged.importRestoreSetIds;
+  if(importRestoreWorkoutIds.size) merged.importRestoreWorkoutIds=[...importRestoreWorkoutIds];
+  else delete merged.importRestoreWorkoutIds;
+  return merged;
 }
 
 function seed(){
